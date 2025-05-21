@@ -36,9 +36,6 @@ $request_id = null;
 
 // เมื่อฟอร์มถูกส่ง
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // เริ่ม transaction
-    $db->beginTransaction();
-    
     try {
         // ตรวจสอบข้อมูลที่จำเป็น
         if (empty($_POST['student_code']) || 
@@ -57,19 +54,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $has_courses = false;
         $course_types = isset($_POST['course_type']) ? $_POST['course_type'] : [];
         
-        foreach ($course_types as $type) {
-            if ($type === 'select' && !empty($_POST['course_id'])) {
+        if (empty($course_types)) {
+            throw new Exception('กรุณาเลือกหรือกรอกข้อมูลรายวิชาอย่างน้อย 1 รายวิชา');
+        }
+        
+        // ตรวจสอบความถูกต้องของข้อมูลรายวิชา
+        foreach ($course_types as $index => $type) {
+            if ($type === 'select') {
+                // ตรวจสอบรายวิชาที่เลือกจากระบบ
+                if (!isset($_POST['course_id'][$index]) || empty($_POST['course_id'][$index])) {
+                    throw new Exception('กรุณาเลือกรายวิชาให้ครบถ้วน');
+                }
+                
+                if (!isset($_POST['teacher_id'][$index]) || empty($_POST['teacher_id'][$index])) {
+                    throw new Exception('กรุณาเลือกครูประจำวิชาให้ครบถ้วน');
+                }
+                
                 $has_courses = true;
-                break;
-            } else if ($type === 'custom' && !empty($_POST['custom_course_code']) && !empty($_POST['custom_course_name'])) {
+            } else if ($type === 'custom') {
+                // ตรวจสอบรายวิชาที่กรอกเอง
+                if (!isset($_POST['custom_course_code'][$index]) || empty($_POST['custom_course_code'][$index])) {
+                    throw new Exception('กรุณากรอกรหัสวิชาให้ครบถ้วน');
+                }
+                
+                if (!isset($_POST['custom_course_name'][$index]) || empty($_POST['custom_course_name'][$index])) {
+                    throw new Exception('กรุณากรอกชื่อรายวิชาให้ครบถ้วน');
+                }
+                
+                if (!isset($_POST['teacher_id'][$index]) || empty($_POST['teacher_id'][$index])) {
+                    throw new Exception('กรุณาเลือกครูประจำวิชาให้ครบถ้วน');
+                }
+                
                 $has_courses = true;
-                break;
             }
         }
         
         if (!$has_courses) {
             throw new Exception('กรุณาเลือกหรือกรอกข้อมูลรายวิชาอย่างน้อย 1 รายวิชา');
         }
+        
+        // เริ่ม transaction
+        $db->beginTransaction();
         
         // สร้างคำขอเปิดรายวิชาใหม่
         $courseRequest->student_id = 0; // ID ชั่วคราว จะอัปเดตในภายหลัง
@@ -113,7 +138,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // อัปเดต student_id ในคำขอ
         $courseRequest->student_id = $temp_student_id;
         
-        if (!$courseRequest->create()) {
+        // แก้ไขใช้ createWithoutTransaction เพราะเราเริ่ม transaction เองแล้ว
+        if (!$courseRequest->createWithoutTransaction()) {
             throw new Exception('เกิดข้อผิดพลาดในการสร้างคำขอ');
         }
         
@@ -121,25 +147,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $request_id = $courseRequest->id;
         
         // เพิ่มรายวิชาในคำขอ
-        $course_count = count($_POST['course_type']);
-        
-        for ($i = 0; $i < $course_count; $i++) {
-            $course_type = $_POST['course_type'][$i];
-            
-            if ($course_type === 'select' && !empty($_POST['course_id'][$i]) && !empty($_POST['teacher_id'][$i])) {
+        foreach ($course_types as $index => $course_type) {
+            if ($course_type === 'select' && !empty($_POST['course_id'][$index]) && !empty($_POST['teacher_id'][$index])) {
                 // กรณีเลือกจากรายวิชาที่มีอยู่แล้ว
-                if (!$courseRequest->addRequestItem($_POST['course_id'][$i], $_POST['teacher_id'][$i])) {
+                if (!$courseRequest->addRequestItem($_POST['course_id'][$index], $_POST['teacher_id'][$index])) {
                     throw new Exception('เกิดข้อผิดพลาดในการเพิ่มรายวิชา');
                 }
             } 
-            else if ($course_type === 'custom' && !empty($_POST['custom_course_code'][$i]) && !empty($_POST['custom_course_name'][$i]) && !empty($_POST['teacher_id'][$i])) {
+            else if ($course_type === 'custom' && !empty($_POST['custom_course_code'][$index]) && !empty($_POST['custom_course_name'][$index]) && !empty($_POST['teacher_id'][$index])) {
                 // กรณีกรอกรายวิชาเอง
-                $custom_course_code = $_POST['custom_course_code'][$i];
-                $custom_course_name = $_POST['custom_course_name'][$i];
-                $theory_hours = $_POST['custom_theory_hours'][$i] ?? 0;
-                $practice_hours = $_POST['custom_practice_hours'][$i] ?? 0;
-                $credits = $_POST['custom_credits'][$i] ?? 0;
-                $total_hours = $_POST['custom_total_hours'][$i] ?? 0;
+                $custom_course_code = $_POST['custom_course_code'][$index];
+                $custom_course_name = $_POST['custom_course_name'][$index];
+                $theory_hours = $_POST['custom_theory_hours'][$index] ?? 0;
+                $practice_hours = $_POST['custom_practice_hours'][$index] ?? 0;
+                $credits = $_POST['custom_credits'][$index] ?? 0;
+                $total_hours = $_POST['custom_total_hours'][$index] ?? 0;
                 
                 // ตรวจสอบว่ารายวิชามีอยู่แล้วหรือไม่
                 $course->course_code = $custom_course_code;
@@ -164,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 // เพิ่มรายวิชาลงในคำขอ
-                if (!$courseRequest->addRequestItem($course_id, $_POST['teacher_id'][$i])) {
+                if (!$courseRequest->addRequestItem($course_id, $_POST['teacher_id'][$index])) {
                     throw new Exception('เกิดข้อผิดพลาดในการเพิ่มรายวิชา');
                 }
             }
@@ -436,7 +458,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                             <div class="row">
                                                 <div class="col-md-5">
                                                     <label class="form-label">รายวิชา <span class="text-danger">*</span></label>
-                                                    <select class="form-select course-select" name="course_id[0]" required>
+                                                    <select class="form-select course-select" name="course_id[0]">
                                                         <option value="">-- เลือกรายวิชา --</option>
                                                         <?php foreach ($all_courses as $course_item): ?>
                                                         <option value="<?php echo $course_item['id']; ?>" 
@@ -451,7 +473,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                                 </div>
                                                 <div class="col-md-4">
                                                     <label class="form-label">ครูประจำวิชา <span class="text-danger">*</span></label>
-                                                    <select class="form-select teacher-select" name="teacher_id[0]" required>
+                                                    <select class="form-select teacher-select" name="teacher_id[0]">
                                                         <option value="">-- เลือกครูประจำวิชา --</option>
                                                         <?php foreach ($all_teachers as $teacher_item): ?>
                                                         <option value="<?php echo $teacher_item['id']; ?>">
@@ -579,7 +601,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="row">
                         <div class="col-md-5">
                             <label class="form-label">รายวิชา <span class="text-danger">*</span></label>
-                            <select class="form-select course-select" name="course_id[INDEX]" required>
+                            <select class="form-select course-select" name="course_id[INDEX]">
                                 <option value="">-- เลือกรายวิชา --</option>
                                 <?php foreach ($all_courses as $course_item): ?>
                                 <option value="<?php echo $course_item['id']; ?>" 
@@ -594,7 +616,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">ครูประจำวิชา <span class="text-danger">*</span></label>
-                            <select class="form-select teacher-select" name="teacher_id[INDEX]" required>
+                            <select class="form-select teacher-select" name="teacher_id[INDEX]">
                                 <option value="">-- เลือกครูประจำวิชา --</option>
                                 <?php foreach ($all_teachers as $teacher_item): ?>
                                 <option value="<?php echo $teacher_item['id']; ?>">
@@ -701,265 +723,251 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <script src="assets/js/jquery.min.js"></script>
     <!-- Bootstrap JS -->
     <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <!-- Select2 JS -->
     <!-- Sweet Alert -->
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <script>
-       /**
- * JavaScript แก้ไขเรื่องการเพิ่มรายวิชา
- * ปรับให้สามารถเพิ่มรายวิชาใหม่และกรอกข้อมูลได้ถูกต้อง
- */
-$(document).ready(function() {
-    // Function to initialize Select2 on dropdowns
-    function initializeSelects() {
-        $('.course-select, .teacher-select, .teacher-select-custom').select2({
-            placeholder: "เลือกรายการ",
-            width: '100%',
-            dropdownParent: $('body')
-        });
-    }
-    
-    // Initialize Select2 dropdowns on page load
-    initializeSelects();
-    
-    // Update course details when course is selected
-    $(document).on('change', '.course-select', function() {
-        var selectedOption = $(this).find('option:selected');
-        var container = $(this).closest('.select-course-container');
-        
-        // Get course details from data attributes
-        var theory = selectedOption.data('theory') || '';
-        var practice = selectedOption.data('practice') || '';
-        var credit = selectedOption.data('credit') || '';
-        var hours = selectedOption.data('hours') || '';
-        
-        // Update fields
-        container.find('.theory-hours').val(theory);
-        container.find('.practice-hours').val(practice);
-        container.find('.credits').val(credit);
-        container.find('.total-hours').val(hours);
-    });
-    
-    // คำนวณชั่วโมงรวมจากทฤษฎีและปฏิบัติสำหรับรายวิชาที่กรอกเอง
-    $(document).on('input', '.custom-theory-hours, .custom-practice-hours', function() {
-        var container = $(this).closest('.custom-course-container');
-        var theory = parseInt(container.find('.custom-theory-hours').val()) || 0;
-        var practice = parseInt(container.find('.custom-practice-hours').val()) || 0;
-        var total = theory + practice;
-        
-        container.find('.custom-total-hours').val(total);
-    });
-    
-    // Toggle between select course and custom course
-    $(document).on('change', '.course-type-radio', function() {
-        var container = $(this).closest('.course-item');
-        var value = $(this).val();
-        
-        if (value === 'select') {
-            container.find('.select-course-container').show();
-            container.find('.custom-course-container').hide();
-            
-            // Enable required on select fields
-            container.find('.course-select').prop('required', true);
-            container.find('.teacher-select').prop('required', true);
-            
-            // Disable required on custom fields
-            container.find('.custom-course-code').prop('required', false);
-            container.find('.custom-course-name').prop('required', false);
-            container.find('.teacher-select-custom').prop('required', false);
-        } else {
-            container.find('.select-course-container').hide();
-            container.find('.custom-course-container').show();
-            
-            // Disable required on select fields
-            container.find('.course-select').prop('required', false);
-            container.find('.teacher-select').prop('required', false);
-            
-            // Enable required on custom fields
-            container.find('.custom-course-code').prop('required', true);
-            container.find('.custom-course-name').prop('required', true);
-            container.find('.teacher-select-custom').prop('required', true);
-        }
-    });
-    
-    // Add course button click - FIXED VERSION
-    $('.add-course-btn').click(function() {
-        // Get current index - count existing items to ensure unique index
-        var currentIndex = $('.course-item').length;
-        
-        // Clone template HTML
-        var template = $('#courseItemTemplate').html();
-        
-        // Replace all INDEX placeholders with the current index
-        template = template.replace(/INDEX/g, currentIndex);
-        
-        // Append to container
-        $('.course-items').append(template);
-        
-        // Initialize newly added elements
-        var newItem = $('.course-items .course-item:last');
-        
-        // Destroy and re-initialize Select2 for the new elements
-        newItem.find('.course-select, .teacher-select, .teacher-select-custom').select2({
-            placeholder: "เลือกรายการ",
-            width: '100%',
-            dropdownParent: $('body')
-        });
-        
-        // Set up course type toggles for the new item
-        newItem.find('.course-type-radio').first().prop('checked', true);
-        newItem.find('.select-course-container').show();
-        newItem.find('.custom-course-container').hide();
-    });
-    
-    // Remove course button click (uses event delegation for dynamic elements)
-    $(document).on('click', '.remove-course-btn', function() {
-        // Only allow removal if there's more than one course item
-        if ($('.course-item').length > 1) {
-            $(this).closest('.course-item').remove();
-            
-            // Re-index all course items
-            $('.course-item').each(function(index) {
-                var courseItem = $(this);
-                
-                // Update name attributes for all form elements
-                courseItem.find('[name^="course_type["], [name^="course_id["], [name^="teacher_id["], [name^="theory_hours["], [name^="practice_hours["], [name^="credits["], [name^="total_hours["], [name^="custom_course_code["], [name^="custom_course_name["], [name^="custom_theory_hours["], [name^="custom_practice_hours["], [name^="custom_credits["], [name^="custom_total_hours["]').each(function() {
-                    var name = $(this).attr('name').replace(/\[\d+\]/, '[' + index + ']');
-                    $(this).attr('name', name);
+        $(document).ready(function() {
+            // Function to initialize Select2 on dropdowns
+            function initializeSelects() {
+                $('.course-select, .teacher-select, .teacher-select-custom').select2({
+                    placeholder: "เลือกรายการ",
+                    width: '100%',
+                    dropdownParent: $('body')
                 });
+            }
+            
+            // Initialize Select2 dropdowns on page load
+            initializeSelects();
+            
+            // Update course details when course is selected
+            $(document).on('change', '.course-select', function() {
+                var selectedOption = $(this).find('option:selected');
+                var container = $(this).closest('.select-course-container');
                 
-                // Update ID attributes for radio buttons
-                courseItem.find('[id^="course_type_select_"], [id^="course_type_custom_"]').each(function() {
-                    var id = $(this).attr('id').replace(/\d+$/, index);
-                    $(this).attr('id', id);
-                });
+                // Get course details from data attributes
+                var theory = selectedOption.data('theory') || '';
+                var practice = selectedOption.data('practice') || '';
+                var credit = selectedOption.data('credit') || '';
+                var hours = selectedOption.data('hours') || '';
                 
-                // Update for attributes for labels
-                courseItem.find('label[for^="course_type_select_"], label[for^="course_type_custom_"]').each(function() {
-                    var forAttr = $(this).attr('for').replace(/\d+$/, index);
-                    $(this).attr('for', forAttr);
-                });
+                // Update fields
+                container.find('.theory-hours').val(theory);
+                container.find('.practice-hours').val(practice);
+                container.find('.credits').val(credit);
+                container.find('.total-hours').val(hours);
             });
-        } else {
-            Swal.fire({
-                title: 'ไม่สามารถลบได้',
-                text: 'ต้องมีรายวิชาอย่างน้อย 1 รายวิชา',
-                icon: 'warning',
-                confirmButtonText: 'ตกลง'
+            
+            // คำนวณชั่วโมงรวมจากทฤษฎีและปฏิบัติสำหรับรายวิชาที่กรอกเอง
+            $(document).on('input', '.custom-theory-hours, .custom-practice-hours', function() {
+                var container = $(this).closest('.custom-course-container');
+                var theory = parseInt(container.find('.custom-theory-hours').val()) || 0;
+                var practice = parseInt(container.find('.custom-practice-hours').val()) || 0;
+                var total = theory + practice;
+                
+                container.find('.custom-total-hours').val(total);
             });
-        }
-    });
+            
+            // Toggle between select course and custom course
+            $(document).on('change', '.course-type-radio', function() {
+                var container = $(this).closest('.course-item');
+                var value = $(this).val();
+                
+                if (value === 'select') {
+                    container.find('.select-course-container').show();
+                    container.find('.custom-course-container').hide();
+                    
+                    // Enable required on select fields
+                    container.find('.course-select').prop('required', true);
+                    container.find('.teacher-select').prop('required', true);
+                    
+                    // Disable required on custom fields
+                    container.find('.custom-course-code').prop('required', false);
+                    container.find('.custom-course-name').prop('required', false);
+                    container.find('.teacher-select-custom').prop('required', false);
+                } else {
+                    container.find('.select-course-container').hide();
+                    container.find('.custom-course-container').show();
+                    
+                    // Disable required on select fields
+                    container.find('.course-select').prop('required', false);
+                    container.find('.teacher-select').prop('required', false);
+                    
+                    // Enable required on custom fields
+                    container.find('.custom-course-code').prop('required', true);
+                    container.find('.custom-course-name').prop('required', true);
+                    container.find('.teacher-select-custom').prop('required', true);
+                }
+            });
+            
+            // Add course button click
+            $('.add-course-btn').click(function() {
+                // Get current index - count existing items to ensure unique index
+                var currentIndex = $('.course-item').length;
+                
+                // Clone template HTML
+                var template = $('#courseItemTemplate').html();
+                
+                // Replace all INDEX placeholders with the current index
+                template = template.replace(/INDEX/g, currentIndex);
+                
+                // Append to container
+                $('.course-items').append(template);
+                
+                // Initialize newly added elements
+                var newItem = $('.course-items .course-item:last');
+                
+                // Destroy and re-initialize Select2 for the new elements
+                newItem.find('.course-select, .teacher-select, .teacher-select-custom').select2({
+                    placeholder: "เลือกรายการ",
+                    width: '100%',
+                    dropdownParent: $('body')
+                });
+                
+                // Set up course type toggles for the new item
+                newItem.find('.course-type-radio').first().prop('checked', true);
+                newItem.find('.select-course-container').show();
+                newItem.find('.custom-course-container').hide();
+                
+                // ให้ focus ที่ select รายวิชาของรายการใหม่
+                setTimeout(function() {
+                    newItem.find('.course-select').select2('focus');
+                }, 100);
+            });
+            
+            // Remove course button click (uses event delegation for dynamic elements)
+            $(document).on('click', '.remove-course-btn', function() {
+                // Only allow removal if there's more than one course item
+                if ($('.course-item').length > 1) {
+                    $(this).closest('.course-item').remove();
+                    
+                    // ไม่ต้อง re-index เพราะ server จะรับค่าตามที่ส่งมาโดยไม่ได้ใช้ index เป็นลำดับ
+                    // แต่จะใช้ index เป็นตัวระบุตำแหน่งเท่านั้น
+                } else {
+                    Swal.fire({
+                        title: 'ไม่สามารถลบได้',
+                        text: 'ต้องมีรายวิชาอย่างน้อย 1 รายวิชา',
+                        icon: 'warning',
+                        confirmButtonText: 'ตกลง'
+                    });
+                }
+            });
 
-    // Form validation before submission
-    $('#courseRequestForm').submit(function(e) {
-        var isValid = true;
-        var errorMessages = [];
-        
-        // ตรวจสอบแต่ละรายวิชา
-        $('.course-item').each(function(index) {
-            var courseItem = $(this);
-            var courseType = courseItem.find('input[name^="course_type"]:checked').val();
-            
-            if (courseType === 'select') {
-                // ตรวจสอบรายวิชาที่เลือกจากระบบ
-                if (!courseItem.find('.course-select').val()) {
-                    isValid = false;
-                    errorMessages.push('กรุณาเลือกรายวิชาที่ ' + (index + 1));
+            // Form validation before submission
+            $('#courseRequestForm').submit(function(e) {
+                var isValid = true;
+                var errorMessages = [];
+                
+                // ตรวจสอบแต่ละรายวิชา
+                $('.course-item').each(function(i) {
+                    var visibleIndex = i + 1;  // ใช้ visibleIndex สำหรับการแสดงผลต่อผู้ใช้
+                    var courseItem = $(this);
+                    var courseType = courseItem.find('input[name^="course_type"]:checked').val();
+                    
+                    // ตรวจสอบเฉพาะส่วนที่กำลังแสดงผลตามประเภทที่เลือก
+                    if (courseType === 'select') {
+                        // ส่วนเลือกรายวิชาจากระบบจะถูกตรวจสอบเมื่อแสดงผล
+                        if (courseItem.find('.select-course-container').is(':visible')) {
+                            if (!courseItem.find('.course-select').val()) {
+                                isValid = false;
+                                errorMessages.push('กรุณาเลือกรายวิชาที่ ' + visibleIndex);
+                            }
+                            
+                            if (!courseItem.find('.teacher-select').val()) {
+                                isValid = false;
+                                errorMessages.push('กรุณาเลือกครูประจำวิชาที่ ' + visibleIndex);
+                            }
+                        }
+                    } else if (courseType === 'custom') {
+                        // ส่วนกรอกข้อมูลรายวิชาเองจะถูกตรวจสอบเมื่อแสดงผล
+                        if (courseItem.find('.custom-course-container').is(':visible')) {
+                            if (!courseItem.find('.custom-course-code').val()) {
+                                isValid = false;
+                                errorMessages.push('กรุณากรอกรหัสวิชาที่ ' + visibleIndex);
+                            }
+                            
+                            if (!courseItem.find('.custom-course-name').val()) {
+                                isValid = false;
+                                errorMessages.push('กรุณากรอกชื่อรายวิชาที่ ' + visibleIndex);
+                            }
+                            
+                            if (!courseItem.find('.teacher-select-custom').val()) {
+                                isValid = false;
+                                errorMessages.push('กรุณาเลือกครูประจำวิชาที่ ' + visibleIndex);
+                            }
+                        }
+                    }
+                });
+                
+                // แสดงข้อความแจ้งเตือนถ้ามีข้อผิดพลาด
+                if (!isValid) {
+                    e.preventDefault();
+                    Swal.fire({
+                        title: 'ข้อมูลไม่ครบถ้วน',
+                        html: errorMessages.join('<br>'),
+                        icon: 'error',
+                        confirmButtonText: 'ตกลง'
+                    });
+                    return;
                 }
                 
-                if (!courseItem.find('.teacher-select').val()) {
-                    isValid = false;
-                    errorMessages.push('กรุณาเลือกครูประจำวิชาที่ ' + (index + 1));
-                }
-            } else {
-                // ตรวจสอบรายวิชาที่กรอกเอง
-                if (!courseItem.find('.custom-course-code').val()) {
-                    isValid = false;
-                    errorMessages.push('กรุณากรอกรหัสวิชาที่ ' + (index + 1));
+                // Check for duplicate courses
+                var courseCodes = [];
+                var hasDuplicate = false;
+                
+                $('.course-item').each(function() {
+                    var courseItem = $(this);
+                    var courseType = courseItem.find('input[name^="course_type"]:checked').val();
+                    var courseCode = '';
+                    
+                    if (courseType === 'select') {
+                        var courseId = courseItem.find('.course-select').val();
+                        if (courseId) {
+                            var courseText = courseItem.find('.course-select option:selected').text();
+                            courseCode = courseText.split(' - ')[0].trim();
+                        }
+                    } else {
+                        courseCode = courseItem.find('.custom-course-code').val().trim();
+                    }
+                    
+                    if (courseCode && courseCodes.includes(courseCode)) {
+                        hasDuplicate = true;
+                        return false; // break the loop
+                    }
+                    
+                    if (courseCode) {
+                        courseCodes.push(courseCode);
+                    }
+                });
+                
+                if (hasDuplicate) {
+                    e.preventDefault();
+                    Swal.fire({
+                        title: 'ข้อผิดพลาด',
+                        text: 'มีการเลือกรายวิชาซ้ำกัน กรุณาตรวจสอบข้อมูล',
+                        icon: 'error',
+                        confirmButtonText: 'ตกลง'
+                    });
+                    return;
                 }
                 
-                if (!courseItem.find('.custom-course-name').val()) {
-                    isValid = false;
-                    errorMessages.push('กรุณากรอกชื่อรายวิชาที่ ' + (index + 1));
-                }
-                
-                if (!courseItem.find('.teacher-select-custom').val()) {
-                    isValid = false;
-                    errorMessages.push('กรุณาเลือกครูประจำวิชาที่ ' + (index + 1));
-                }
-            }
-        });
-        
-        // แสดงข้อความแจ้งเตือนถ้ามีข้อผิดพลาด
-        if (!isValid) {
-            e.preventDefault();
-            Swal.fire({
-                title: 'ข้อมูลไม่ครบถ้วน',
-                html: errorMessages.join('<br>'),
-                icon: 'error',
-                confirmButtonText: 'ตกลง'
+                // Confirm submission
+                e.preventDefault();
+                Swal.fire({
+                    title: 'ยืนยันการส่งคำขอ',
+                    text: 'คุณต้องการส่งคำขอเปิดรายวิชานี้ใช่หรือไม่?',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'ใช่, ส่งคำขอ',
+                    cancelButtonText: 'ยกเลิก'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        $(this).unbind('submit').submit();
+                    }
+                });
             });
-            return;
-        }
-        
-        // Check for duplicate courses
-        var courseCodes = [];
-        var hasDuplicate = false;
-        
-        $('.course-item').each(function() {
-            var courseItem = $(this);
-            var courseType = courseItem.find('input[name^="course_type"]:checked').val();
-            var courseCode = '';
-            
-            if (courseType === 'select') {
-                var courseId = courseItem.find('.course-select').val();
-                if (courseId) {
-                    var courseText = courseItem.find('.course-select option:selected').text();
-                    courseCode = courseText.split(' - ')[0];
-                }
-            } else {
-                courseCode = courseItem.find('.custom-course-code').val();
-            }
-            
-            if (courseCode && courseCodes.includes(courseCode)) {
-                hasDuplicate = true;
-                return false; // break the loop
-            }
-            
-            if (courseCode) {
-                courseCodes.push(courseCode);
-            }
         });
-        
-        if (hasDuplicate) {
-            e.preventDefault();
-            Swal.fire({
-                title: 'ข้อผิดพลาด',
-                text: 'มีการเลือกรายวิชาซ้ำกัน กรุณาตรวจสอบข้อมูล',
-                icon: 'error',
-                confirmButtonText: 'ตกลง'
-            });
-            return;
-        }
-        
-        // Confirm submission
-        e.preventDefault();
-        Swal.fire({
-            title: 'ยืนยันการส่งคำขอ',
-            text: 'คุณต้องการส่งคำขอเปิดรายวิชานี้ใช่หรือไม่?',
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'ใช่, ส่งคำขอ',
-            cancelButtonText: 'ยกเลิก'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                $(this).unbind('submit').submit();
-            }
-        });
-    });
-});
     </script>
 </body>
 </html>

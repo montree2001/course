@@ -520,5 +520,62 @@ class CourseRequest {
             return false;
         }
     }
+
+    // Create new course request without starting a new transaction
+    public function createWithoutTransaction() {
+        try {
+            // Query to insert course request
+            $query = "INSERT INTO " . $this->table_name . " 
+                      (student_id, semester, academic_year, request_date, status, created_at, updated_at) 
+                      VALUES 
+                      (:student_id, :semester, :academic_year, :request_date, :status, NOW(), NOW())";
+            
+            // Prepare statement
+            $stmt = $this->conn->prepare($query);
+            
+            // Sanitize input
+            $this->student_id = htmlspecialchars(strip_tags($this->student_id));
+            $this->semester = htmlspecialchars(strip_tags($this->semester));
+            $this->academic_year = htmlspecialchars(strip_tags($this->academic_year));
+            $this->status = htmlspecialchars(strip_tags($this->status));
+            
+            // Set default request date to now if not provided
+            if (empty($this->request_date)) {
+                $this->request_date = date('Y-m-d');
+            }
+            
+            // Bind parameters
+            $stmt->bindParam(':student_id', $this->student_id);
+            $stmt->bindParam(':semester', $this->semester);
+            $stmt->bindParam(':academic_year', $this->academic_year);
+            $stmt->bindParam(':request_date', $this->request_date);
+            $stmt->bindParam(':status', $this->status);
+            
+            // Execute query
+            if ($stmt->execute()) {
+                // Get the last inserted ID
+                $this->id = $this->conn->lastInsertId();
+                
+                // Log initial status
+                $this->logStatusChange($this->student_id, $this->status, 'ยื่นคำขอเปิดรายวิชา');
+                
+                return true;
+            }
+            
+            return false;
+            
+        } catch (Exception $e) {
+            // Just return false on error, let the calling code handle transaction
+            return false;
+        }
+    }
+
+
+
+
+
+
+
+
 }
 ?>

@@ -302,7 +302,7 @@ $all_courses = $course->getAllCourses();
     <script src="../assets/js/jquery.dataTables.min.js"></script>
     <script src="../assets/js/dataTables.bootstrap5.min.js"></script>
     <!-- Sweet Alert -->
-    <script src="../assets/js/sweetalert2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <script>
         $(document).ready(function() {
