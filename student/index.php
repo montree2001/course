@@ -131,7 +131,7 @@ try {
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <img src="../assets/images/study.svg" alt="ยื่นคำร้องขอเปิดรายวิชา" class="img-fluid hero-image">
+                    <img src="../assets/images/logo.png" alt="ยื่นคำร้องขอเปิดรายวิชา" class="img-fluid hero-image">
                 </div>
             </div>
         </div>

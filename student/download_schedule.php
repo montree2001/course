@@ -1,11 +1,11 @@
 <?php
 // student/download_schedule.php
-// หน้าดาวน์โหลดตารางเรียน
+// หน้าดาวน์โหลดตารางเรียนที่รองรับมือถือ
 
 session_start();
 require_once '../config/db_connect.php';
 require_once '../config/functions.php';
-require_once '../vendor/autoload.php';
+require_once '../mpdf/vendor/autoload.php';
 
 // ตรวจสอบว่ามีการระบุ ID คำร้อง
 if (!isset($_GET['id']) || empty($_GET['id'])) {
@@ -236,6 +236,9 @@ if (isset($_GET['print']) && $_GET['print'] === 'true' && empty($error)) {
     <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     
+    <!-- Custom CSS for Mobile -->
+    <link href="../assets/css/mobile.css" rel="stylesheet">
+    
     <style>
         .day-schedule {
             margin-bottom: 2rem;
@@ -250,10 +253,52 @@ if (isset($_GET['print']) && $_GET['print'] === 'true' && empty($error)) {
         
         .schedule-card {
             transition: transform 0.2s;
+            margin-bottom: 1rem;
         }
         
         .schedule-card:hover {
             transform: translateY(-3px);
+        }
+        
+        .schedule-time {
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        
+        .schedule-course {
+            font-weight: bold;
+        }
+        
+        .schedule-teacher {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .schedule-room {
+            display: inline-block;
+            background-color: #e9ecef;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+        }
+        
+        .day-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .day-icon {
+            margin-right: 0.5rem;
+            font-size: 1.5rem;
+            color: #0d6efd;
+        }
+        
+        .info-card {
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
         }
         
         @media print {
@@ -265,6 +310,61 @@ if (isset($_GET['print']) && $_GET['print'] === 'true' && empty($error)) {
                 width: 100%;
                 max-width: 100%;
             }
+            
+            .day-header {
+                break-inside: avoid;
+            }
+            
+            .schedule-card {
+                break-inside: avoid;
+            }
+            
+            .page-break {
+                page-break-before: always;
+            }
+        }
+        
+        /* เพิ่ม CSS สำหรับมือถือ */
+        @media (max-width: 767.98px) {
+            .schedule-card .card-body {
+                padding: 0.75rem;
+            }
+            
+            .schedule-time {
+                font-size: 0.9rem;
+            }
+            
+            .schedule-course {
+                font-size: 1rem;
+                margin-bottom: 0.25rem;
+            }
+            
+            .schedule-teacher {
+                font-size: 0.85rem;
+            }
+            
+            .schedule-room {
+                font-size: 0.85rem;
+                margin-top: 0.25rem;
+            }
+            
+            .day-icon {
+                font-size: 1.25rem;
+            }
+            
+            .day-header h5 {
+                font-size: 1.1rem;
+                margin-bottom: 0;
+            }
+            
+            .btn-group {
+                width: 100%;
+                margin-bottom: 1rem;
+            }
+            
+            .btn-group .btn {
+                flex: 1;
+            }
         }
     </style>
 </head>
@@ -273,7 +373,7 @@ if (isset($_GET['print']) && $_GET['print'] === 'true' && empty($error)) {
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary no-print">
         <div class="container">
             <a class="navbar-brand" href="../index.php">
-                ระบบขอเปิดรายวิชา วิทยาลัยการอาชีพปราสาท
+                ระบบขอเปิดรายวิชา
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -281,13 +381,13 @@ if (isset($_GET['print']) && $_GET['print'] === 'true' && empty($error)) {
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="../index.php">หน้าหลัก</a>
+                        <a class="nav-link" href="../index.php"><i class="bi bi-house-door"></i> หน้าหลัก</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="request_form.php">ยื่นคำร้อง</a>
+                        <a class="nav-link" href="request_form.php"><i class="bi bi-file-earmark-plus"></i> ยื่นคำร้อง</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="track_status.php">ตรวจสอบสถานะ</a>
+                        <a class="nav-link" href="track_status.php"><i class="bi bi-search"></i> ตรวจสอบสถานะ</a>
                     </li>
                 </ul>
             </div>
@@ -299,10 +399,10 @@ if (isset($_GET['print']) && $_GET['print'] === 'true' && empty($error)) {
             <div class="col-md-10">
                 <div class="card shadow">
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">ตารางเรียนภาคเรียนพิเศษ</h5>
+                        <h5 class="card-title mb-0"><i class="bi bi-calendar2-week"></i> ตารางเรียนภาคเรียนพิเศษ</h5>
                         
                         <?php if (empty($error)): ?>
-                            <div class="btn-group no-print">
+                            <div class="btn-group no-print d-none d-md-flex">
                                 <a href="?id=<?php echo $request_id; ?>&print=true" class="btn btn-light btn-sm">
                                     <i class="bi bi-file-pdf"></i> ดาวน์โหลด PDF
                                 </a>
@@ -330,19 +430,19 @@ if (isset($_GET['print']) && $_GET['print'] === 'true' && empty($error)) {
                             
                             <div class="row mb-4">
                                 <div class="col-md-12">
-                                    <div class="card">
+                                    <div class="card info-card">
                                         <div class="card-header bg-light">
-                                            <h5 class="card-title mb-0">ข้อมูลนักเรียน/นักศึกษา</h5>
+                                            <h5 class="card-title mb-0"><i class="bi bi-person-badge"></i> ข้อมูลนักเรียน/นักศึกษา</h5>
                                         </div>
                                         <div class="card-body">
                                             <div class="row">
-                                                <div class="col-md-6">
-                                                    <p><strong>รหัสนักเรียน:</strong> <?php echo $request['student_code']; ?></p>
-                                                    <p><strong>ชื่อ-นามสกุล:</strong> <?php echo $request['prefix'] . $request['first_name'] . ' ' . $request['last_name']; ?></p>
+                                                <div class="col-md-6 col-12">
+                                                    <p class="mb-2"><strong>รหัสนักเรียน:</strong> <?php echo $request['student_code']; ?></p>
+                                                    <p class="mb-2"><strong>ชื่อ-นามสกุล:</strong> <?php echo $request['prefix'] . $request['first_name'] . ' ' . $request['last_name']; ?></p>
                                                 </div>
-                                                <div class="col-md-6">
-                                                    <p><strong>ระดับชั้น:</strong> <?php echo $request['level'] . ' ปีที่ ' . $request['year']; ?></p>
-                                                    <p><strong>สาขาวิชา:</strong> <?php echo $request['department_name']; ?></p>
+                                                <div class="col-md-6 col-12">
+                                                    <p class="mb-2"><strong>ระดับชั้น:</strong> <?php echo $request['level'] . ' ปีที่ ' . $request['year']; ?></p>
+                                                    <p class="mb-0"><strong>สาขาวิชา:</strong> <?php echo $request['department_name']; ?></p>
                                                 </div>
                                             </div>
                                         </div>
@@ -350,8 +450,11 @@ if (isset($_GET['print']) && $_GET['print'] === 'true' && empty($error)) {
                                 </div>
                             </div>
                             
-                            <h5 class="card-title mb-3">รายวิชาที่ลงทะเบียน</h5>
-                            <div class="table-responsive mb-4">
+                            <!-- รายวิชาที่ลงทะเบียน -->
+                            <h5 class="card-title mb-3"><i class="bi bi-book"></i> รายวิชาที่ลงทะเบียน</h5>
+                            
+                            <!-- สำหรับหน้าจอขนาดใหญ่ (PC) -->
+                            <div class="table-responsive d-none d-md-block mb-4">
                                 <table class="table table-bordered table-hover">
                                     <thead class="table-light">
                                         <tr>
@@ -376,7 +479,39 @@ if (isset($_GET['print']) && $_GET['print'] === 'true' && empty($error)) {
                                 </table>
                             </div>
                             
-                            <h5 class="card-title mb-3">ตารางเรียน</h5>
+                            <!-- สำหรับหน้าจอขนาดเล็ก (มือถือ) -->
+                            <div class="d-md-none mb-4">
+                                <?php foreach ($details as $index => $detail): ?>
+                                    <div class="card mb-2">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <div class="schedule-course"><?php echo $detail['course_code']; ?></div>
+                                                    <div><?php echo $detail['course_name']; ?></div>
+                                                </div>
+                                                <span class="badge bg-primary"><?php echo $detail['credit_hours']; ?> หน่วยกิต</span>
+                                            </div>
+                                            <div class="schedule-teacher mt-2">
+                                                <i class="bi bi-person"></i> <?php echo $detail['prefix'] . $detail['first_name'] . ' ' . $detail['last_name']; ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                            
+                            <h5 class="card-title mb-3"><i class="bi bi-calendar-check"></i> ตารางเรียน</h5>
+                            
+                            <!-- ปุ่มสำหรับมือถือ -->
+                            <div class="d-md-none no-print mb-3">
+                                <div class="btn-group w-100">
+                                    <a href="?id=<?php echo $request_id; ?>&print=true" class="btn btn-primary">
+                                        <i class="bi bi-file-pdf"></i> ดาวน์โหลด PDF
+                                    </a>
+                                    <button onclick="window.print();" class="btn btn-secondary">
+                                        <i class="bi bi-printer"></i> พิมพ์
+                                    </button>
+                                </div>
+                            </div>
                             
                             <?php if (empty($schedules)): ?>
                                 <div class="alert alert-warning">
@@ -386,33 +521,45 @@ if (isset($_GET['print']) && $_GET['print'] === 'true' && empty($error)) {
                                 <div class="row">
                                     <?php
                                     $days_of_week = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
+                                    $day_icons = [
+                                        'จันทร์' => 'bi-1-circle-fill',
+                                        'อังคาร' => 'bi-2-circle-fill',
+                                        'พุธ' => 'bi-3-circle-fill',
+                                        'พฤหัสบดี' => 'bi-4-circle-fill', 
+                                        'ศุกร์' => 'bi-5-circle-fill',
+                                        'เสาร์' => 'bi-6-circle-fill',
+                                        'อาทิตย์' => 'bi-7-circle-fill'
+                                    ];
                                     
                                     foreach ($days_of_week as $day) {
                                         if (isset($schedules_by_day[$day])) {
                                             echo '<div class="col-md-12 day-schedule">';
+                                            echo '<div class="day-header">';
+                                            echo '<i class="bi ' . $day_icons[$day] . ' day-icon"></i>';
                                             echo '<h5>วัน' . $day . '</h5>';
+                                            echo '</div>';
                                             
                                             foreach ($schedules_by_day[$day] as $schedule) {
                                                 $time_slot = timeThaiFormat($schedule['start_time']) . ' - ' . timeThaiFormat($schedule['end_time']);
                                                 
-                                                echo '<div class="card schedule-card mb-3 shadow-sm">';
+                                                echo '<div class="card schedule-card shadow-sm">';
                                                 echo '<div class="card-body">';
                                                 echo '<div class="row">';
                                                 
                                                 // เวลา
-                                                echo '<div class="col-md-2">';
-                                                echo '<strong>' . $time_slot . '</strong>';
+                                                echo '<div class="col-md-2 col-12 mb-md-0 mb-2">';
+                                                echo '<div class="schedule-time"><i class="bi bi-clock"></i> ' . $time_slot . '</div>';
                                                 echo '</div>';
                                                 
                                                 // รายละเอียดรายวิชา
-                                                echo '<div class="col-md-8">';
-                                                echo '<div><strong>' . $schedule['course_code'] . '</strong> - ' . $schedule['course_name'] . '</div>';
-                                                echo '<div class="text-muted">ครูผู้สอน: ' . $schedule['teacher_prefix'] . $schedule['teacher_first_name'] . ' ' . $schedule['teacher_last_name'] . '</div>';
+                                                echo '<div class="col-md-8 col-12 mb-md-0 mb-2">';
+                                                echo '<div class="schedule-course">' . $schedule['course_code'] . ' - ' . $schedule['course_name'] . '</div>';
+                                                echo '<div class="schedule-teacher"><i class="bi bi-person"></i> ' . $schedule['teacher_prefix'] . $schedule['teacher_first_name'] . ' ' . $schedule['teacher_last_name'] . '</div>';
                                                 echo '</div>';
                                                 
                                                 // ห้องเรียน
-                                                echo '<div class="col-md-2 text-end">';
-                                                echo '<span class="badge bg-info">ห้อง ' . $schedule['room'] . '</span>';
+                                                echo '<div class="col-md-2 col-12 text-md-end">';
+                                                echo '<div class="schedule-room"><i class="bi bi-door-open"></i> ห้อง ' . $schedule['room'] . '</div>';
                                                 echo '</div>';
                                                 
                                                 echo '</div>';
@@ -432,7 +579,7 @@ if (isset($_GET['print']) && $_GET['print'] === 'true' && empty($error)) {
                                     <i class="bi bi-arrow-left"></i> กลับไปยังหน้าตรวจสอบสถานะ
                                 </a>
                                 <?php if (!empty($schedules)): ?>
-                                    <a href="?id=<?php echo $request_id; ?>&print=true" class="btn btn-primary">
+                                    <a href="?id=<?php echo $request_id; ?>&print=true" class="btn btn-primary d-none d-md-inline-block">
                                         <i class="bi bi-file-pdf"></i> ดาวน์โหลด PDF
                                     </a>
                                 <?php endif; ?>

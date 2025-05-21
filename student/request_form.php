@@ -1,6 +1,6 @@
 <?php
 // student/request_form.php
-// หน้าแบบฟอร์มยื่นคำร้องขอเปิดรายวิชา
+// หน้าแบบฟอร์มยื่นคำร้องขอเปิดรายวิชาที่รองรับมือถือ
 
 session_start();
 require_once '../config/db_connect.php';
@@ -189,12 +189,18 @@ $default_academic_year = $thai_year;
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    
     <!-- Select2 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
     
     <!-- SweetAlert2 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.3/dist/sweetalert2.min.css" rel="stylesheet">
+    
+    <!-- Custom CSS for Mobile -->
+    <link href="../assets/css/mobile.css" rel="stylesheet">
     
     <style>
         .form-section {
@@ -209,6 +215,31 @@ $default_academic_year = $thai_year;
             .btn-remove-course {
                 margin-top: 10px;
             }
+            
+            .select2-container {
+                width: 100% !important;
+            }
+            
+            .course-item .row > div {
+                margin-bottom: 10px;
+            }
+        }
+        
+        /* ซ่อน scroll bar แต่ยังสามารถเลื่อนได้ */
+        .select2-results {
+            max-height: 50vh !important;
+        }
+        
+        /* ปรับขนาดปุ่มให้เหมาะกับหน้าจอมือถือ */
+        @media (max-width: 575.98px) {
+            #btnAddCourse {
+                width: 100%;
+                margin-bottom: 15px;
+            }
+            
+            .d-grid.gap-2.d-md-flex .btn {
+                margin-bottom: 10px;
+            }
         }
     </style>
 </head>
@@ -217,7 +248,7 @@ $default_academic_year = $thai_year;
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
             <a class="navbar-brand" href="../index.php">
-                ระบบขอเปิดรายวิชา วิทยาลัยการอาชีพปราสาท
+                ระบบขอเปิดรายวิชา
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -225,13 +256,13 @@ $default_academic_year = $thai_year;
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="../index.php">หน้าหลัก</a>
+                        <a class="nav-link" href="../index.php"><i class="bi bi-house-door"></i> หน้าหลัก</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" href="request_form.php">ยื่นคำร้อง</a>
+                        <a class="nav-link active" href="request_form.php"><i class="bi bi-file-earmark-plus"></i> ยื่นคำร้อง</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="track_status.php">ตรวจสอบสถานะ</a>
+                        <a class="nav-link" href="track_status.php"><i class="bi bi-search"></i> ตรวจสอบสถานะ</a>
                     </li>
                 </ul>
             </div>
@@ -243,7 +274,7 @@ $default_academic_year = $thai_year;
             <div class="col-md-10">
                 <div class="card shadow">
                     <div class="card-header bg-primary text-white">
-                        <h5 class="card-title mb-0">แบบฟอร์มคำร้องขอเปิดรายวิชาภาคเรียนพิเศษ</h5>
+                        <h5 class="card-title mb-0">แบบฟอร์มคำร้องขอเปิดรายวิชา</h5>
                     </div>
                     <div class="card-body">
                         <?php if (!empty($error)): ?>
@@ -257,10 +288,10 @@ $default_academic_year = $thai_year;
                         <form method="post" id="requestForm">
                             <!-- ข้อมูลนักเรียน -->
                             <div class="form-section">
-                                <h5 class="mb-3">ข้อมูลนักเรียน/นักศึกษา</h5>
+                                <h5 class="mb-3"><i class="bi bi-person-badge"></i> ข้อมูลนักเรียน/นักศึกษา</h5>
                                 
                                 <div class="row g-3">
-                                    <div class="col-md-2">
+                                    <div class="col-md-2 col-4">
                                         <label for="prefix" class="form-label">คำนำหน้า</label>
                                         <select class="form-select" id="prefix" name="prefix" required>
                                             <option value="นาย" <?php echo (isset($_POST['prefix']) && $_POST['prefix'] === 'นาย') ? 'selected' : ''; ?>>นาย</option>
@@ -268,22 +299,28 @@ $default_academic_year = $thai_year;
                                         </select>
                                     </div>
                                     
-                                    <div class="col-md-5">
+                                    <div class="col-md-5 col-8">
                                         <label for="first_name" class="form-label">ชื่อ</label>
                                         <input type="text" class="form-control" id="first_name" name="first_name" value="<?php echo $_POST['first_name'] ?? ''; ?>" required>
                                     </div>
                                     
-                                    <div class="col-md-5">
+                                    <div class="col-md-5 col-12">
                                         <label for="last_name" class="form-label">นามสกุล</label>
                                         <input type="text" class="form-control" id="last_name" name="last_name" value="<?php echo $_POST['last_name'] ?? ''; ?>" required>
                                     </div>
                                     
-                                    <div class="col-md-4">
+                                    <div class="col-md-4 col-12">
                                         <label for="student_code" class="form-label">รหัสประจำตัว</label>
-                                        <input type="text" class="form-control" id="student_code" name="student_code" value="<?php echo $_POST['student_code'] ?? ''; ?>" required>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" id="student_code" name="student_code" value="<?php echo $_POST['student_code'] ?? ''; ?>" required>
+                                            <button class="btn btn-outline-secondary" type="button" id="btnSearchStudent">
+                                                <i class="bi bi-search"></i>
+                                            </button>
+                                        </div>
+                                        <small class="form-text text-muted">กดปุ่มค้นหาเพื่อดึงข้อมูลนักเรียน</small>
                                     </div>
                                     
-                                    <div class="col-md-4">
+                                    <div class="col-md-4 col-6">
                                         <label for="level" class="form-label">ระดับชั้น</label>
                                         <select class="form-select" id="level" name="level" required>
                                             <option value="">-- เลือกระดับชั้น --</option>
@@ -292,7 +329,7 @@ $default_academic_year = $thai_year;
                                         </select>
                                     </div>
                                     
-                                    <div class="col-md-4">
+                                    <div class="col-md-4 col-6">
                                         <label for="year" class="form-label">ชั้นปีที่</label>
                                         <select class="form-select" id="year" name="year" required>
                                             <option value="">-- เลือกชั้นปี --</option>
@@ -302,7 +339,7 @@ $default_academic_year = $thai_year;
                                         </select>
                                     </div>
                                     
-                                    <div class="col-md-6">
+                                    <div class="col-md-6 col-12">
                                         <label for="department_id" class="form-label">สาขาวิชา</label>
                                         <select class="form-select select2" id="department_id" name="department_id" required>
                                             <option value="">-- เลือกสาขาวิชา --</option>
@@ -314,7 +351,7 @@ $default_academic_year = $thai_year;
                                         </select>
                                     </div>
                                     
-                                    <div class="col-md-6">
+                                    <div class="col-md-6 col-12">
                                         <label for="phone" class="form-label">เบอร์โทรศัพท์ที่ติดต่อได้</label>
                                         <input type="tel" class="form-control" id="phone" name="phone" value="<?php echo $_POST['phone'] ?? ''; ?>" required>
                                     </div>
@@ -323,10 +360,10 @@ $default_academic_year = $thai_year;
                             
                             <!-- ข้อมูลการขอเปิดรายวิชา -->
                             <div class="form-section">
-                                <h5 class="mb-3">ข้อมูลการขอเปิดรายวิชา</h5>
+                                <h5 class="mb-3"><i class="bi bi-calendar3"></i> ข้อมูลการขอเปิดรายวิชา</h5>
                                 
                                 <div class="row g-3">
-                                    <div class="col-md-6">
+                                    <div class="col-md-6 col-6">
                                         <label for="semester" class="form-label">ภาคเรียนที่</label>
                                         <select class="form-select" id="semester" name="semester" required>
                                             <option value="">-- เลือกภาคเรียน --</option>
@@ -336,7 +373,7 @@ $default_academic_year = $thai_year;
                                         </select>
                                     </div>
                                     
-                                    <div class="col-md-6">
+                                    <div class="col-md-6 col-6">
                                         <label for="academic_year" class="form-label">ปีการศึกษา</label>
                                         <select class="form-select" id="academic_year" name="academic_year" required>
                                             <option value="">-- เลือกปีการศึกษา --</option>
@@ -353,14 +390,14 @@ $default_academic_year = $thai_year;
                             
                             <!-- รายวิชาที่ต้องการขอเปิด -->
                             <div class="form-section">
-                                <h5 class="mb-3">รายวิชาที่ต้องการขอเปิด</h5>
+                                <h5 class="mb-3"><i class="bi bi-book"></i> รายวิชาที่ต้องการขอเปิด</h5>
                                 
                                 <div id="courseContainer">
                                     <!-- รายวิชาแรก -->
                                     <div class="course-item mb-3 p-3 border rounded">
                                         <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label">รายวิชา</label>
+                                            <div class="col-md-6 col-12">
+                                                <label class="form-label">รายวิชา <span class="text-danger">*</span></label>
                                                 <select class="form-select course-select select2" name="course_id[]" required>
                                                     <option value="">-- เลือกรายวิชา --</option>
                                                     <?php foreach ($courses as $course): ?>
@@ -371,10 +408,10 @@ $default_academic_year = $thai_year;
                                                 </select>
                                             </div>
                                             
-                                            <div class="col-md-5">
-                                                <label class="form-label">ครูประจำรายวิชา</label>
+                                            <div class="col-md-5 col-10">
+                                                <label class="form-label">ครูประจำวิชา <span class="text-danger">*</span></label>
                                                 <select class="form-select teacher-select select2" name="teacher_id[]" required>
-                                                    <option value="">-- เลือกครูประจำรายวิชา --</option>
+                                                    <option value="">-- เลือกครูประจำวิชา --</option>
                                                     <?php foreach ($teachers as $teacher): ?>
                                                         <option value="<?php echo $teacher['teacher_id']; ?>">
                                                             <?php echo $teacher['prefix'] . $teacher['first_name'] . ' ' . $teacher['last_name']; ?>
@@ -383,9 +420,9 @@ $default_academic_year = $thai_year;
                                                 </select>
                                             </div>
                                             
-                                            <div class="col-md-1">
+                                            <div class="col-md-1 col-2">
                                                 <button type="button" class="btn btn-danger btn-remove-course d-none">
-                                                    <i class="bi bi-trash"></i> ลบ
+                                                    <i class="bi bi-trash"></i>
                                                 </button>
                                             </div>
                                         </div>
@@ -435,9 +472,12 @@ $default_academic_year = $thai_year;
     
     <script>
         $(document).ready(function() {
-            // Initialize Select2
+            // Initialize Select2 with mobile-friendly settings
             $('.select2').select2({
-                theme: 'bootstrap-5'
+                theme: 'bootstrap-5',
+                width: '100%',
+                dropdownCssClass: 'select2-dropdown-large', // เพิ่มคลาสสำหรับปรับแต่ง dropdown
+                selectionCssClass: 'select2-selection-large', // เพิ่มคลาสสำหรับปรับแต่งส่วนที่เลือก
             });
             
             // แสดงข้อความสำเร็จด้วย SweetAlert2
@@ -460,18 +500,45 @@ $default_academic_year = $thai_year;
                 courseItem.find('select').val('');
                 courseItem.find('.btn-remove-course').removeClass('d-none');
                 
+                // ล้างค่า Select2
+                courseItem.find('.select2-container').remove();
+                
                 // เพิ่มลงในคอนเทนเนอร์
                 $('#courseContainer').append(courseItem);
                 
                 // Initialize Select2 for new elements
                 courseItem.find('.select2').select2({
-                    theme: 'bootstrap-5'
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    dropdownCssClass: 'select2-dropdown-large',
+                    selectionCssClass: 'select2-selection-large',
                 });
+                
+                // เลื่อนไปที่รายวิชาที่เพิ่มใหม่
+                $('html, body').animate({
+                    scrollTop: courseItem.offset().top - 100
+                }, 500);
             });
             
             // ลบรายวิชา
             $(document).on('click', '.btn-remove-course', function() {
-                $(this).closest('.course-item').remove();
+                const courseItem = $(this).closest('.course-item');
+                
+                // แสดง confirm dialog ด้วย SweetAlert2
+                Swal.fire({
+                    title: 'ยืนยันการลบ',
+                    text: "คุณต้องการลบรายวิชานี้ใช่หรือไม่?",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'ใช่, ลบรายวิชา',
+                    cancelButtonText: 'ยกเลิก'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        courseItem.remove();
+                    }
+                });
             });
             
             // ตรวจสอบข้อมูลก่อนส่งฟอร์ม
@@ -493,26 +560,40 @@ $default_academic_year = $thai_year;
                 
                 // ตรวจสอบว่าเลือกรายวิชาและครูครบทุกช่อง
                 let hasEmptyFields = false;
+                let emptyFieldIndex = -1;
                 
                 courseSelects.each(function(index) {
                     if ($(this).val() === '') {
                         hasEmptyFields = true;
+                        emptyFieldIndex = index;
                         return false;
                     }
                 });
                 
-                teacherSelects.each(function(index) {
-                    if ($(this).val() === '') {
-                        hasEmptyFields = true;
-                        return false;
-                    }
-                });
+                if (!hasEmptyFields) {
+                    teacherSelects.each(function(index) {
+                        if ($(this).val() === '') {
+                            hasEmptyFields = true;
+                            emptyFieldIndex = index;
+                            return false;
+                        }
+                    });
+                }
                 
                 if (hasEmptyFields) {
                     e.preventDefault();
+                    
+                    // เลื่อนไปที่ช่องที่ว่าง
+                    if (emptyFieldIndex >= 0) {
+                        const emptyItem = $('.course-item').eq(emptyFieldIndex);
+                        $('html, body').animate({
+                            scrollTop: emptyItem.offset().top - 100
+                        }, 500);
+                    }
+                    
                     Swal.fire({
                         title: 'ข้อผิดพลาด!',
-                        text: 'กรุณาเลือกรายวิชาและครูประจำรายวิชาให้ครบทุกช่อง',
+                        text: 'กรุณาเลือกรายวิชาและครูประจำวิชาให้ครบทุกช่อง',
                         icon: 'error',
                         confirmButtonText: 'ตกลง'
                     });
@@ -522,12 +603,14 @@ $default_academic_year = $thai_year;
                 // ตรวจสอบว่าไม่มีรายวิชาซ้ำ
                 const courseValues = [];
                 let hasDuplicate = false;
+                let duplicateValue = '';
                 
                 courseSelects.each(function() {
                     const value = $(this).val();
                     
                     if (value !== '' && courseValues.includes(value)) {
                         hasDuplicate = true;
+                        duplicateValue = value;
                         return false;
                     }
                     
@@ -536,23 +619,69 @@ $default_academic_year = $thai_year;
                 
                 if (hasDuplicate) {
                     e.preventDefault();
+                    
+                    // หาชื่อรายวิชาที่ซ้ำ
+                    let courseName = '';
+                    courses.forEach(function(course) {
+                        if (course.course_id == duplicateValue) {
+                            courseName = course.course_code + ' - ' + course.course_name;
+                        }
+                    });
+                    
                     Swal.fire({
                         title: 'ข้อผิดพลาด!',
-                        text: 'พบรายวิชาซ้ำในรายการ กรุณาเลือกรายวิชาที่ไม่ซ้ำกัน',
+                        text: 'พบรายวิชาซ้ำ: ' + courseName + ' กรุณาเลือกรายวิชาที่ไม่ซ้ำกัน',
                         icon: 'error',
                         confirmButtonText: 'ตกลง'
                     });
                     return;
                 }
+                
+                // แสดง loading เมื่อส่งฟอร์ม
+                Swal.fire({
+                    title: 'กำลังดำเนินการ',
+                    text: 'กรุณารอสักครู่...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
             });
             
             // ค้นหาข้อมูลนักเรียนจากรหัสประจำตัว
-            $('#student_code').blur(function() {
-                const studentCode = $(this).val();
+            $('#btnSearchStudent').click(function() {
+                searchStudent();
+            });
+            
+            $('#student_code').keypress(function(e) {
+                if (e.which === 13) {
+                    e.preventDefault();
+                    searchStudent();
+                }
+            });
+            
+            function searchStudent() {
+                const studentCode = $('#student_code').val();
                 
                 if (studentCode === '') {
+                    Swal.fire({
+                        title: 'ข้อผิดพลาด!',
+                        text: 'กรุณากรอกรหัสนักเรียน',
+                        icon: 'error',
+                        confirmButtonText: 'ตกลง'
+                    });
                     return;
                 }
+                
+                // แสดง loading
+                Swal.fire({
+                    title: 'กำลังค้นหา',
+                    text: 'กรุณารอสักครู่...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
                 
                 $.ajax({
                     url: '../api/student_info.php',
@@ -560,6 +689,8 @@ $default_academic_year = $thai_year;
                     data: { student_code: studentCode },
                     dataType: 'json',
                     success: function(response) {
+                        Swal.close();
+                        
                         if (response.success) {
                             $('#prefix').val(response.data.prefix);
                             $('#first_name').val(response.data.first_name);
@@ -568,11 +699,48 @@ $default_academic_year = $thai_year;
                             $('#year').val(response.data.year);
                             $('#department_id').val(response.data.department_id).trigger('change');
                             $('#phone').val(response.data.phone);
+                            
+                            Swal.fire({
+                                title: 'พบข้อมูล!',
+                                text: 'ดึงข้อมูลนักเรียนสำเร็จ',
+                                icon: 'success',
+                                confirmButtonText: 'ตกลง'
+                            });
+                        } else {
+                            Swal.fire({
+                                title: 'ไม่พบข้อมูล',
+                                text: response.message,
+                                icon: 'info',
+                                confirmButtonText: 'ตกลง'
+                            });
                         }
+                    },
+                    error: function() {
+                        Swal.close();
+                        Swal.fire({
+                            title: 'ข้อผิดพลาด!',
+                            text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้',
+                            icon: 'error',
+                            confirmButtonText: 'ตกลง'
+                        });
                     }
                 });
-            });
+            }
+            
+            // ตรวจจับอุปกรณ์มือถือและปรับการแสดงผล Select2
+            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                // เพิ่มการจัดการสำหรับมือถือเพิ่มเติม
+                
+                // ปรับการแสดงผล Select2 ให้เปิดแบบเต็มหน้าจอบนมือถือ
+                $(document).on('select2:open', () => {
+                    const allFound = document.querySelectorAll('.select2-container--open .select2-search__field');
+                    allFound[allFound.length - 1].focus();
+                });
+            }
         });
+        
+        // ข้อมูลรายวิชาสำหรับตรวจสอบความซ้ำ
+        const courses = <?php echo json_encode($courses); ?>;
     </script>
 </body>
 </html>
