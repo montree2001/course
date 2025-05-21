@@ -241,6 +241,10 @@ class Course {
         // Query to check if course code exists
         $query = "SELECT id FROM " . $this->table_name . " WHERE course_code = :course_code";
         
+        if ($this->id) {
+            $query .= " AND id != :id";
+        }
+        
         // Prepare statement
         $stmt = $this->conn->prepare($query);
         
@@ -249,6 +253,10 @@ class Course {
         
         // Bind parameter
         $stmt->bindParam(':course_code', $this->course_code);
+        
+        if ($this->id) {
+            $stmt->bindParam(':id', $this->id);
+        }
         
         // Execute query
         $stmt->execute();

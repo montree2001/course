@@ -310,8 +310,8 @@ class PDF {
                     <div>3) เรียน ผู้อำนวยการ</div>
                     <div>
                         <div style="margin-bottom: 10px;">
-                            <span class="checkbox"></span> เห็นสมควรอนุมัติ<br>
-                            <span class="checkbox"></span> ไม่สมควรอนุมัติ
+                            <span class="checkbox" style="<?php echo $request_details['status'] === 'approved_curriculum' || $request_details['status'] === 'approved_deputy' || $request_details['status'] === 'approved' ? 'background-color: #000;' : ''; ?>"></span> เห็นสมควรอนุมัติ<br>
+                            <span class="checkbox" style="<?php echo $request_details['status'] === 'rejected' && strpos($request_details['rejected_reason'], 'หัวหน้างานพัฒนาหลักสูตร') !== false ? 'background-color: #000;' : ''; ?>"></span> ไม่สมควรอนุมัติ
                         </div>
                         <div style="margin-bottom: 20px;"></div>
                         <div>................................................. หัวหน้างานพัฒนาหลักสูตรฯ</div>
@@ -324,8 +324,8 @@ class PDF {
                     <div>4) เรียน ผู้อำนวยการ</div>
                     <div>
                         <div style="margin-bottom: 10px;">
-                            <span class="checkbox"></span> เห็นสมควรอนุมัติ<br>
-                            <span class="checkbox"></span> ไม่สมควรอนุมัติ เนื่องจาก..................................
+                            <span class="checkbox" style="<?php echo $request_details['status'] === 'approved_deputy' || $request_details['status'] === 'approved' ? 'background-color: #000;' : ''; ?>"></span> เห็นสมควรอนุมัติ<br>
+                            <span class="checkbox" style="<?php echo $request_details['status'] === 'rejected' && strpos($request_details['rejected_reason'], 'รองผู้อำนวยการ') !== false ? 'background-color: #000;' : ''; ?>"></span> ไม่สมควรอนุมัติ เนื่องจาก..................................
                         </div>
                         <div style="margin-bottom: 20px;"></div>
                         <div>................................................. รองผู้อำนวยการฝ่ายวิชาการ</div>
@@ -338,11 +338,11 @@ class PDF {
             <div class="final-approval">
                 <div><b>คำพิจารณาสั่งการฯ ของผู้อำนวยการวิทยาลัยการอาชีพปราสาท</b></div>
                 <div style="margin-top: 10px;">
-                    <span class="checkbox"></span> อนุมัติ และมอบ<br>
+                    <span class="checkbox" style="<?php echo $request_details['status'] === 'approved' ? 'background-color: #000;' : ''; ?>"></span> อนุมัติ และมอบ<br>
                     <span style="margin-left: 20px;">1) งานพัฒนาหลักสูตรฯ จัดตารางเรียน-ตารางสอน</span><br>
                     <span style="margin-left: 20px;">2) งานทะเบียนดำเนินการให้นักเรียน นักศึกษาลงทะเบียนเรียน</span><br>
                     <span style="margin-left: 20px;">3) แจ้งครูที่ปรึกษา ครูประจำรายวิชา และนักเรียนนักศึกษาทราบ</span><br>
-                    <span class="checkbox"></span> ไม่อนุมัติ เนื่องจาก........................................................................................................................................................................
+                    <span class="checkbox" style="<?php echo $request_details['status'] === 'rejected' && strpos($request_details['rejected_reason'], 'ผู้อำนวยการ') !== false ? 'background-color: #000;' : ''; ?>"></span> ไม่อนุมัติ เนื่องจาก.....................................................................................................................................................................................
                 </div>
                 <div style="margin-top: 20px; text-align: center;">
                     <div style="margin-bottom: 40px;"></div>
@@ -958,6 +958,285 @@ class PDF {
         } else {
             $this->mpdf->Output('ตารางเรียน_ภาคเรียน' . $schedule->semester . '_' . $schedule->academic_year . '.pdf', 'I');
         }
+        
+        return true;
+    }
+    
+    // Generate course detail report PDF
+    public function generateCourseDetailPDF($course_id) {
+        // Include necessary classes
+        include_once '../classes/Course.php';
+        include_once '../classes/CourseRequest.php';
+        
+        // Create objects
+        $course_obj = new Course($this->conn);
+        $course_obj->id = $course_id;
+        
+        // Get course details
+        if (!$course_obj->getCourseById()) {
+            return false;
+        }
+        
+        // Get requests for this course
+        $query = "SELECT cr.*, 
+                 s.student_code, 
+                 CONCAT(s.name_prefix, s.first_name, ' ', s.last_name) as student_name,
+                 s.education_level, s.year, s.major
+                 FROM course_requests cr
+                 JOIN course_request_items cri ON cr.id = cri.course_request_id
+                 JOIN students s ON cr.student_id = s.id
+                 WHERE cri.course_id = :course_id
+                 ORDER BY cr.id DESC";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':course_id', $course_id);
+        $stmt->execute();
+        
+        $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Set PDF properties
+        $this->mpdf->SetTitle('รายงานรายวิชา ' . $course_obj->course_code);
+        
+        // Start capturing output buffer
+        ob_start();
+        
+        // HTML content for PDF
+        ?>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>รายงานรายวิชา</title>
+            <style>
+                body {
+                    font-family: 'thsarabun';
+                    font-size: 16pt;
+                    line-height: 1.3;
+                }
+                .header {
+                    text-align: center;
+                    margin-bottom: 20px;
+                }
+                .report-title {
+                    text-align: center;
+                    font-weight: bold;
+                    font-size: 20pt;
+                    margin-bottom: 10px;
+                }
+                .report-subtitle {
+                    text-align: center;
+                    font-size: 16pt;
+                    margin-bottom: 20px;
+                }
+                .section {
+                    margin-bottom: 20px;
+                }
+                .section-title {
+                    font-weight: bold;
+                    font-size: 18pt;
+                    margin-bottom: 10px;
+                    border-bottom: 1px solid #ddd;
+                    padding-bottom: 5px;
+                }
+                .course-details {
+                    margin-bottom: 20px;
+                }
+                .course-details .row {
+                    margin-bottom: 5px;
+                }
+                .label {
+                    font-weight: bold;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 15px 0;
+                }
+                table, th, td {
+                    border: 1px solid black;
+                }
+                th {
+                    background-color: #f2f2f2;
+                    text-align: center;
+                    font-weight: bold;
+                    padding: 5px;
+                }
+                td {
+                    padding: 5px;
+                }
+                .footer {
+                    text-align: center;
+                    margin-top: 30px;
+                    font-style: italic;
+                    font-size: 14pt;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <img src="../assets/images/logo.png" width="60" />
+            </div>
+            
+            <div class="report-title">รายงานรายวิชา</div>
+            <div class="report-subtitle"><?php echo $course_obj->course_code . ' - ' . $course_obj->course_name; ?></div>
+            
+            <div class="course-details">
+                <div class="row">
+                    <span class="label">รหัสวิชา:</span> <?php echo $course_obj->course_code; ?>
+                </div>
+                <div class="row">
+                    <span class="label">ชื่อรายวิชา:</span> <?php echo $course_obj->course_name; ?>
+                </div>
+                <div class="row">
+                    <span class="label">หน่วยกิต:</span> <?php echo $course_obj->credits; ?> หน่วยกิต (ทฤษฎี <?php echo $course_obj->theory_hours; ?> - ปฏิบัติ <?php echo $course_obj->practice_hours; ?>)
+                </div>
+                <div class="row">
+                    <span class="label">จำนวนชั่วโมง:</span> <?php echo $course_obj->total_hours; ?> ชั่วโมง
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">รายการคำขอเปิดรายวิชา</div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="5%">ลำดับ</th>
+                            <th width="10%">รหัสคำขอ</th>
+                            <th width="15%">รหัสนักศึกษา</th>
+                            <th width="25%">ชื่อ-นามสกุล</th>
+                            <th width="15%">ระดับชั้น/สาขา</th>
+                            <th width="10%">วันที่ขอ</th>
+                            <th width="10%">สถานะ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $i = 1;
+                        foreach ($requests as $request):
+                            // Determine status text and style
+                            $statusText = '';
+                            switch($request['status']) {
+                                case 'pending':
+                                    $statusText = 'รอดำเนินการ';
+                                    break;
+                                case 'approved_advisor':
+                                    $statusText = 'ที่ปรึกษาอนุมัติ';
+                                    break;
+                                case 'approved_department':
+                                    $statusText = 'หัวหน้าแผนกอนุมัติ';
+                                    break;
+                                case 'approved_curriculum':
+                                    $statusText = 'หัวหน้างานพัฒนาหลักสูตรอนุมัติ';
+                                    break;
+                                case 'approved_deputy':
+                                    $statusText = 'รองผู้อำนวยการฝ่ายวิชาการอนุมัติ';
+                                    break;
+                                case 'approved':
+                                    $statusText = 'อนุมัติแล้ว';
+                                    break;
+                                case 'rejected':
+                                    $statusText = 'ไม่อนุมัติ';
+                                    break;
+                            }
+                        ?>
+                        <tr>
+                            <td style="text-align: center;"><?php echo $i++; ?></td>
+                            <td style="text-align: center;"><?php echo $request['id']; ?></td>
+                            <td style="text-align: center;"><?php echo $request['student_code']; ?></td>
+                            <td><?php echo $request['student_name']; ?></td>
+                            <td><?php echo $request['education_level'] . ' ปี ' . $request['year'] . ' ' . $request['major']; ?></td>
+                            <td style="text-align: center;"><?php echo date('d/m/Y', strtotime($request['request_date'])); ?></td>
+                            <td style="text-align: center;"><?php echo $statusText; ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if (count($requests) == 0): ?>
+                        <tr>
+                            <td colspan="7" style="text-align: center;">ไม่พบข้อมูล</td>
+                        </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">สรุปข้อมูล</div>
+                
+                <?php
+                // Count by status
+                $status_counts = [
+                    'pending' => 0,
+                    'approved' => 0,
+                    'rejected' => 0,
+                    'total' => count($requests)
+                ];
+                
+                foreach ($requests as $request) {
+                    if ($request['status'] === 'approved') {
+                        $status_counts['approved']++;
+                    } elseif ($request['status'] === 'rejected') {
+                        $status_counts['rejected']++;
+                    } else {
+                        $status_counts['pending']++;
+                    }
+                }
+                ?>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>สถานะ</th>
+                            <th>จำนวน</th>
+                            <th>ร้อยละ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>รอดำเนินการ</td>
+                            <td style="text-align: center;"><?php echo $status_counts['pending']; ?></td>
+                            <td style="text-align: center;">
+                                <?php echo $status_counts['total'] > 0 ? number_format(($status_counts['pending'] / $status_counts['total']) * 100, 2) : 0; ?>%
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>อนุมัติแล้ว</td>
+                            <td style="text-align: center;"><?php echo $status_counts['approved']; ?></td>
+                            <td style="text-align: center;">
+                                <?php echo $status_counts['total'] > 0 ? number_format(($status_counts['approved'] / $status_counts['total']) * 100, 2) : 0; ?>%
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>ไม่อนุมัติ</td>
+                            <td style="text-align: center;"><?php echo $status_counts['rejected']; ?></td>
+                            <td style="text-align: center;">
+                                <?php echo $status_counts['total'] > 0 ? number_format(($status_counts['rejected'] / $status_counts['total']) * 100, 2) : 0; ?>%
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>รวมทั้งหมด</strong></td>
+                            <td style="text-align: center;"><strong><?php echo $status_counts['total']; ?></strong></td>
+                            <td style="text-align: center;"><strong>100%</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="footer">
+                รายงานนี้ออกจากระบบขอเปิดรายวิชา วิทยาลัยการอาชีพปราสาท<br>
+                วันที่พิมพ์: <?php echo date('d/m/Y H:i:s'); ?>
+            </div>
+        </body>
+        </html>
+        <?php
+        
+        // Get the output buffer content
+        $html = ob_get_clean();
+        
+        // Write HTML to PDF
+        $this->mpdf->WriteHTML($html);
+        
+        // Output PDF (D = download, I = inline view)
+        $this->mpdf->Output('รายงานรายวิชา_' . $course_obj->course_code . '.pdf', 'I');
         
         return true;
     }

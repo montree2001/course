@@ -1,48 +1,46 @@
 <?php
-// Include database and necessary classes
-
-/* แสดง Error */
+// แสดง Error สำหรับการพัฒนา
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 
-
+// Include database และ classes ที่จำเป็น
 include_once 'config/database.php';
 include_once 'classes/Course.php';
 include_once 'classes/Teacher.php';
 include_once 'classes/CourseRequest.php';
 
-// Create database connection
+// สร้าง database connection
 $database = new Database();
 $db = $database->connect();
 
-// Create objects
+// สร้าง objects
 $course = new Course($db);
 $teacher = new Teacher($db);
 $courseRequest = new CourseRequest($db);
 
-// Get current semester and academic year
-// In production, this would likely be set in the settings table
+// กำหนดภาคเรียนและปีการศึกษาปัจจุบัน
 $current_semester = "1";
 $current_academic_year = "2568";
 
-// Get all courses for dropdown
+// ดึงข้อมูลรายวิชาทั้งหมดสำหรับ dropdown
 $all_courses = $course->getAllCourses();
 
-// Get all teachers for dropdown
+// ดึงข้อมูลครูทั้งหมดสำหรับ dropdown
 $all_teachers = $teacher->getAllTeachers();
 
-// Process form submission
+// ตัวแปรสำหรับแสดงข้อความต่างๆ
 $success_message = '';
 $error_message = '';
 $request_id = null;
 
+// เมื่อฟอร์มถูกส่ง
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Begin transaction
+    // เริ่ม transaction
     $db->beginTransaction();
     
     try {
-        // Validate required fields
+        // ตรวจสอบข้อมูลที่จำเป็น
         if (empty($_POST['student_code']) || 
             empty($_POST['name_prefix']) || 
             empty($_POST['first_name']) || 
@@ -50,21 +48,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             empty($_POST['education_level']) || 
             empty($_POST['year']) || 
             empty($_POST['major']) || 
-            empty($_POST['phone_number']) || 
-            empty($_POST['course_id']) || 
-            empty($_POST['teacher_id'])) {
+            empty($_POST['phone_number'])) {
             
-            throw new Exception('กรุณากรอกข้อมูลให้ครบถ้วน');
+            throw new Exception('กรุณากรอกข้อมูลนักศึกษาให้ครบถ้วน');
         }
         
-        // Create new course request
-        $courseRequest->student_id = 0; // Temporary ID, will be updated later
+        // ตรวจสอบว่ามีข้อมูลรายวิชาที่เลือกหรือกรอกเอง
+        $has_courses = false;
+        $course_types = isset($_POST['course_type']) ? $_POST['course_type'] : [];
+        
+        foreach ($course_types as $type) {
+            if ($type === 'select' && !empty($_POST['course_id'])) {
+                $has_courses = true;
+                break;
+            } else if ($type === 'custom' && !empty($_POST['custom_course_code']) && !empty($_POST['custom_course_name'])) {
+                $has_courses = true;
+                break;
+            }
+        }
+        
+        if (!$has_courses) {
+            throw new Exception('กรุณาเลือกหรือกรอกข้อมูลรายวิชาอย่างน้อย 1 รายวิชา');
+        }
+        
+        // สร้างคำขอเปิดรายวิชาใหม่
+        $courseRequest->student_id = 0; // ID ชั่วคราว จะอัปเดตในภายหลัง
         $courseRequest->semester = $current_semester;
         $courseRequest->academic_year = $current_academic_year;
         $courseRequest->request_date = date('Y-m-d');
         $courseRequest->status = 'pending';
         
-        // Student data
+        // ข้อมูลนักศึกษา
         $student_code = $_POST['student_code'];
         $name_prefix = $_POST['name_prefix'];
         $first_name = $_POST['first_name'];
@@ -74,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $major = $_POST['major'];
         $phone_number = $_POST['phone_number'];
         
-        // Insert temporary student data for non-logged in students
+        // เพิ่มข้อมูลนักศึกษาชั่วคราวสำหรับผู้ที่ไม่ได้ login
         $query = "INSERT INTO temp_students 
                   (student_code, name_prefix, first_name, last_name, education_level, year, major, phone_number, created_at) 
                   VALUES 
@@ -96,22 +110,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $temp_student_id = $db->lastInsertId();
         
-        // Update student_id in course request
+        // อัปเดต student_id ในคำขอ
         $courseRequest->student_id = $temp_student_id;
         
         if (!$courseRequest->create()) {
             throw new Exception('เกิดข้อผิดพลาดในการสร้างคำขอ');
         }
         
-        // Request ID for reference
+        // รหัสคำขอสำหรับอ้างอิง
         $request_id = $courseRequest->id;
         
-        // Add course request items
-        $course_count = count($_POST['course_id']);
+        // เพิ่มรายวิชาในคำขอ
+        $course_count = count($_POST['course_type']);
         
         for ($i = 0; $i < $course_count; $i++) {
-            if (!empty($_POST['course_id'][$i]) && !empty($_POST['teacher_id'][$i])) {
+            $course_type = $_POST['course_type'][$i];
+            
+            if ($course_type === 'select' && !empty($_POST['course_id'][$i]) && !empty($_POST['teacher_id'][$i])) {
+                // กรณีเลือกจากรายวิชาที่มีอยู่แล้ว
                 if (!$courseRequest->addRequestItem($_POST['course_id'][$i], $_POST['teacher_id'][$i])) {
+                    throw new Exception('เกิดข้อผิดพลาดในการเพิ่มรายวิชา');
+                }
+            } 
+            else if ($course_type === 'custom' && !empty($_POST['custom_course_code'][$i]) && !empty($_POST['custom_course_name'][$i]) && !empty($_POST['teacher_id'][$i])) {
+                // กรณีกรอกรายวิชาเอง
+                $custom_course_code = $_POST['custom_course_code'][$i];
+                $custom_course_name = $_POST['custom_course_name'][$i];
+                $theory_hours = $_POST['custom_theory_hours'][$i] ?? 0;
+                $practice_hours = $_POST['custom_practice_hours'][$i] ?? 0;
+                $credits = $_POST['custom_credits'][$i] ?? 0;
+                $total_hours = $_POST['custom_total_hours'][$i] ?? 0;
+                
+                // ตรวจสอบว่ารายวิชามีอยู่แล้วหรือไม่
+                $course->course_code = $custom_course_code;
+                $course_exists = $course->getCourseByCode();
+                
+                if (!$course_exists) {
+                    // เพิ่มรายวิชาใหม่
+                    $course->course_code = $custom_course_code;
+                    $course->course_name = $custom_course_name;
+                    $course->theory_hours = $theory_hours;
+                    $course->practice_hours = $practice_hours;
+                    $course->credits = $credits;
+                    $course->total_hours = $total_hours;
+                    
+                    if (!$course->create()) {
+                        throw new Exception('เกิดข้อผิดพลาดในการเพิ่มรายวิชาใหม่');
+                    }
+                    
+                    $course_id = $course->id;
+                } else {
+                    $course_id = $course->id;
+                }
+                
+                // เพิ่มรายวิชาลงในคำขอ
+                if (!$courseRequest->addRequestItem($course_id, $_POST['teacher_id'][$i])) {
                     throw new Exception('เกิดข้อผิดพลาดในการเพิ่มรายวิชา');
                 }
             }
@@ -123,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $success_message = 'ส่งคำขอเปิดรายวิชาเรียบร้อยแล้ว';
         
     } catch (Exception $e) {
-        // Rollback transaction on error
+        // Rollback transaction ในกรณีที่มีข้อผิดพลาด
         $db->rollBack();
         
         $error_message = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
@@ -145,6 +198,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="assets/css/style.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+    
+    <style>
+        /* Custom CSS for course request form */
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: #0d6efd;
+            color: white;
+            font-size: 14px;
+            margin-right: 8px;
+        }
+        
+        .course-item {
+            transition: all 0.3s ease;
+        }
+        
+        .course-item:hover {
+            box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.15);
+        }
+        
+        .remove-course-btn {
+            width: 38px;
+        }
+        
+        /* Make sure select2 dropdowns display properly */
+        .select2-container {
+            z-index: 1060;
+            width: 100% !important;
+        }
+        
+        /* Customize placeholder fields */
+        input[readonly].form-control {
+            background-color: #f8f9fa;
+        }
+        
+        /* Style for success message */
+        .success-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        /* Add spacing between elements */
+        .form-label {
+            margin-bottom: 0.3rem;
+        }
+        
+        /* Custom styles for course type toggle */
+        .course-type-toggle {
+            margin-bottom: 10px;
+        }
+        
+        .course-type-radio {
+            margin-right: 10px;
+        }
+        
+        .select-course-container,
+        .custom-course-container {
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .custom-course-container {
+            border-left: 3px solid #0d6efd;
+        }
+    </style>
 </head>
 <body>
     <!-- Navbar -->
@@ -193,6 +319,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     <div class="container mt-4">
         <?php if (!empty($success_message) && $request_id): ?>
+        <!-- แสดงข้อความเมื่อส่งฟอร์มสำเร็จ -->
         <div class="row">
             <div class="col-md-12">
                 <div class="alert alert-success" role="alert">
@@ -212,6 +339,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </div>
         <?php elseif(!$request_id): ?>
+        <!-- แสดงฟอร์มสำหรับกรอกข้อมูล -->
         <div class="row">
             <div class="col-md-12">
                 <div class="card shadow-sm">
@@ -286,47 +414,123 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <hr>
                             
                             <h5 class="mb-3">รายวิชาที่ต้องการขอเปิด</h5>
+                            
+                            <!-- Container สำหรับรายวิชาทั้งหมด -->
                             <div class="course-items">
+                                <!-- Template สำหรับรายวิชา -->
                                 <div class="card mb-3 course-item">
                                     <div class="card-body">
-                                        <div class="row">
-                                            <div class="col-md-5">
-                                                <label class="form-label">รายวิชา <span class="text-danger">*</span></label>
-                                                <select class="form-select course-select" name="course_id[]" required>
-                                                    <option value="">-- เลือกรายวิชา --</option>
-                                                    <?php foreach ($all_courses as $course_item): ?>
-                                                    <option value="<?php echo $course_item['id']; ?>" data-theory="<?php echo $course_item['theory_hours']; ?>" data-practice="<?php echo $course_item['practice_hours']; ?>" data-credit="<?php echo $course_item['credits']; ?>" data-hours="<?php echo $course_item['total_hours']; ?>">
-                                                        <?php echo $course_item['course_code'] . ' - ' . $course_item['course_name']; ?>
-                                                    </option>
-                                                    <?php endforeach; ?>
-                                                </select>
+                                        <div class="course-type-toggle mb-3">
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input course-type-radio" type="radio" name="course_type[0]" id="course_type_select_0" value="select" checked>
+                                                <label class="form-check-label" for="course_type_select_0">เลือกจากรายการ</label>
                                             </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">ครูประจำวิชา <span class="text-danger">*</span></label>
-                                                <select class="form-select teacher-select" name="teacher_id[]" required>
-                                                    <option value="">-- เลือกครูประจำวิชา --</option>
-                                                    <?php foreach ($all_teachers as $teacher_item): ?>
-                                                    <option value="<?php echo $teacher_item['id']; ?>">
-                                                        <?php echo $teacher_item['name_prefix'] . $teacher_item['first_name'] . ' ' . $teacher_item['last_name']; ?>
-                                                    </option>
-                                                    <?php endforeach; ?>
-                                                </select>
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input course-type-radio" type="radio" name="course_type[0]" id="course_type_custom_0" value="custom">
+                                                <label class="form-check-label" for="course_type_custom_0">กรอกข้อมูลเอง</label>
                                             </div>
-                                            <div class="col-md-3">
-                                                <label class="form-label">รายละเอียด</label>
-                                                <div class="row">
-                                                    <div class="col-3">
-                                                        <input type="text" class="form-control theory-hours" placeholder="ท" readonly>
+                                        </div>
+                                        
+                                        <!-- ส่วนเลือกรายวิชาจากระบบ -->
+                                        <div class="select-course-container">
+                                            <div class="row">
+                                                <div class="col-md-5">
+                                                    <label class="form-label">รายวิชา <span class="text-danger">*</span></label>
+                                                    <select class="form-select course-select" name="course_id[0]" required>
+                                                        <option value="">-- เลือกรายวิชา --</option>
+                                                        <?php foreach ($all_courses as $course_item): ?>
+                                                        <option value="<?php echo $course_item['id']; ?>" 
+                                                            data-theory="<?php echo $course_item['theory_hours']; ?>" 
+                                                            data-practice="<?php echo $course_item['practice_hours']; ?>" 
+                                                            data-credit="<?php echo $course_item['credits']; ?>" 
+                                                            data-hours="<?php echo $course_item['total_hours']; ?>">
+                                                            <?php echo $course_item['course_code'] . ' - ' . $course_item['course_name']; ?>
+                                                        </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label">ครูประจำวิชา <span class="text-danger">*</span></label>
+                                                    <select class="form-select teacher-select" name="teacher_id[0]" required>
+                                                        <option value="">-- เลือกครูประจำวิชา --</option>
+                                                        <?php foreach ($all_teachers as $teacher_item): ?>
+                                                        <option value="<?php echo $teacher_item['id']; ?>">
+                                                            <?php echo $teacher_item['name_prefix'] . $teacher_item['first_name'] . ' ' . $teacher_item['last_name']; ?>
+                                                        </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">รายละเอียด</label>
+                                                    <div class="row">
+                                                        <div class="col-3">
+                                                            <input type="text" class="form-control theory-hours" name="theory_hours[0]" placeholder="ท" readonly>
+                                                        </div>
+                                                        <div class="col-3">
+                                                            <input type="text" class="form-control practice-hours" name="practice_hours[0]" placeholder="ป" readonly>
+                                                        </div>
+                                                        <div class="col-3">
+                                                            <input type="text" class="form-control credits" name="credits[0]" placeholder="นก" readonly>
+                                                        </div>
+                                                        <div class="col-3">
+                                                            <input type="text" class="form-control total-hours" name="total_hours[0]" placeholder="ชม" readonly>
+                                                        </div>
                                                     </div>
-                                                    <div class="col-3">
-                                                        <input type="text" class="form-control practice-hours" placeholder="ป" readonly>
-                                                    </div>
-                                                    <div class="col-3">
-                                                        <input type="text" class="form-control credits" placeholder="นก" readonly>
-                                                    </div>
-                                                    <div class="col-3">
-                                                        <input type="text" class="form-control total-hours" placeholder="ชม" readonly>
-                                                    </div>
+                                                </div>
+                                                <div class="col-md-1">
+                                                    <label class="form-label">&nbsp;</label>
+                                                    <button type="button" class="btn btn-danger remove-course-btn">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- ส่วนกรอกรายวิชาเอง -->
+                                        <div class="custom-course-container" style="display: none;">
+                                            <div class="row mb-3">
+                                                <div class="col-md-3">
+                                                    <label class="form-label">รหัสวิชา <span class="text-danger">*</span></label>
+                                                    <input type="text" class="form-control custom-course-code" name="custom_course_code[0]" placeholder="เช่น 20001-1001">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">ชื่อรายวิชา <span class="text-danger">*</span></label>
+                                                    <input type="text" class="form-control custom-course-name" name="custom_course_name[0]" placeholder="เช่น ภาษาไทยพื้นฐาน">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label">ครูประจำวิชา <span class="text-danger">*</span></label>
+                                                    <select class="form-select teacher-select-custom" name="teacher_id[0]">
+                                                        <option value="">-- เลือกครูประจำวิชา --</option>
+                                                        <?php foreach ($all_teachers as $teacher_item): ?>
+                                                        <option value="<?php echo $teacher_item['id']; ?>">
+                                                            <?php echo $teacher_item['name_prefix'] . $teacher_item['first_name'] . ' ' . $teacher_item['last_name']; ?>
+                                                        </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-md-3">
+                                                    <label class="form-label">จำนวนชั่วโมงทฤษฎี</label>
+                                                    <input type="number" class="form-control custom-theory-hours" name="custom_theory_hours[0]" min="0" value="0">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label">จำนวนชั่วโมงปฏิบัติ</label>
+                                                    <input type="number" class="form-control custom-practice-hours" name="custom_practice_hours[0]" min="0" value="0">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">หน่วยกิต</label>
+                                                    <input type="number" class="form-control custom-credits" name="custom_credits[0]" min="0" value="0">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">จำนวนชั่วโมงรวม</label>
+                                                    <input type="number" class="form-control custom-total-hours" name="custom_total_hours[0]" min="0" value="0">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">&nbsp;</label>
+                                                    <button type="button" class="btn btn-danger remove-course-btn d-block">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -334,12 +538,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </div>
                             </div>
                             
+                            <!-- ปุ่มเพิ่มรายวิชา -->
                             <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-3">
                                 <button type="button" class="btn btn-success add-course-btn">
                                     <i class="fas fa-plus me-2"></i> เพิ่มรายวิชา
                                 </button>
                             </div>
                             
+                            <!-- ปุ่มส่งฟอร์ม -->
                             <div class="d-grid">
                                 <button type="submit" class="btn btn-primary btn-lg">
                                     <i class="fas fa-paper-plane me-2"></i> ส่งคำขอเปิดรายวิชา
@@ -353,54 +559,122 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
     </div>
     
+    <!-- Template สำหรับ Clone รายวิชา (ซ่อนไว้) -->
     <div id="courseItemTemplate" style="display: none;">
         <div class="card mb-3 course-item">
             <div class="card-body">
-                <div class="row">
-                    <div class="col-md-5">
-                        <label class="form-label">รายวิชา <span class="text-danger">*</span></label>
-                        <select class="form-select course-select" name="course_id[]" required>
-                            <option value="">-- เลือกรายวิชา --</option>
-                            <?php foreach ($all_courses as $course_item): ?>
-                            <option value="<?php echo $course_item['id']; ?>" data-theory="<?php echo $course_item['theory_hours']; ?>" data-practice="<?php echo $course_item['practice_hours']; ?>" data-credit="<?php echo $course_item['credits']; ?>" data-hours="<?php echo $course_item['total_hours']; ?>">
-                                <?php echo $course_item['course_code'] . ' - ' . $course_item['course_name']; ?>
-                            </option>
-                            <?php endforeach; ?>
-                        </select>
+                <div class="course-type-toggle mb-3">
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input course-type-radio" type="radio" name="course_type[INDEX]" id="course_type_select_INDEX" value="select" checked>
+                        <label class="form-check-label" for="course_type_select_INDEX">เลือกจากรายการ</label>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label">ครูประจำวิชา <span class="text-danger">*</span></label>
-                        <select class="form-select teacher-select" name="teacher_id[]" required>
-                            <option value="">-- เลือกครูประจำวิชา --</option>
-                            <?php foreach ($all_teachers as $teacher_item): ?>
-                            <option value="<?php echo $teacher_item['id']; ?>">
-                                <?php echo $teacher_item['name_prefix'] . $teacher_item['first_name'] . ' ' . $teacher_item['last_name']; ?>
-                            </option>
-                            <?php endforeach; ?>
-                        </select>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input course-type-radio" type="radio" name="course_type[INDEX]" id="course_type_custom_INDEX" value="custom">
+                        <label class="form-check-label" for="course_type_custom_INDEX">กรอกข้อมูลเอง</label>
                     </div>
-                    <div class="col-md-2">
-                        <label class="form-label">รายละเอียด</label>
-                        <div class="row">
-                            <div class="col-3">
-                                <input type="text" class="form-control theory-hours" placeholder="ท" readonly>
-                            </div>
-                            <div class="col-3">
-                                <input type="text" class="form-control practice-hours" placeholder="ป" readonly>
-                            </div>
-                            <div class="col-3">
-                                <input type="text" class="form-control credits" placeholder="นก" readonly>
-                            </div>
-                            <div class="col-3">
-                                <input type="text" class="form-control total-hours" placeholder="ชม" readonly>
+                </div>
+                
+                <!-- ส่วนเลือกรายวิชาจากระบบ -->
+                <div class="select-course-container">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <label class="form-label">รายวิชา <span class="text-danger">*</span></label>
+                            <select class="form-select course-select" name="course_id[INDEX]" required>
+                                <option value="">-- เลือกรายวิชา --</option>
+                                <?php foreach ($all_courses as $course_item): ?>
+                                <option value="<?php echo $course_item['id']; ?>" 
+                                    data-theory="<?php echo $course_item['theory_hours']; ?>" 
+                                    data-practice="<?php echo $course_item['practice_hours']; ?>" 
+                                    data-credit="<?php echo $course_item['credits']; ?>" 
+                                    data-hours="<?php echo $course_item['total_hours']; ?>">
+                                    <?php echo $course_item['course_code'] . ' - ' . $course_item['course_name']; ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">ครูประจำวิชา <span class="text-danger">*</span></label>
+                            <select class="form-select teacher-select" name="teacher_id[INDEX]" required>
+                                <option value="">-- เลือกครูประจำวิชา --</option>
+                                <?php foreach ($all_teachers as $teacher_item): ?>
+                                <option value="<?php echo $teacher_item['id']; ?>">
+                                    <?php echo $teacher_item['name_prefix'] . $teacher_item['first_name'] . ' ' . $teacher_item['last_name']; ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">รายละเอียด</label>
+                            <div class="row">
+                                <div class="col-3">
+                                    <input type="text" class="form-control theory-hours" name="theory_hours[INDEX]" placeholder="ท" readonly>
+                                </div>
+                                <div class="col-3">
+                                    <input type="text" class="form-control practice-hours" name="practice_hours[INDEX]" placeholder="ป" readonly>
+                                </div>
+                                <div class="col-3">
+                                    <input type="text" class="form-control credits" name="credits[INDEX]" placeholder="นก" readonly>
+                                </div>
+                                <div class="col-3">
+                                    <input type="text" class="form-control total-hours" name="total_hours[INDEX]" placeholder="ชม" readonly>
+                                </div>
                             </div>
                         </div>
+                        <div class="col-md-1">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button" class="btn btn-danger remove-course-btn">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="col-md-1">
-                        <label class="form-label">&nbsp;</label>
-                        <button type="button" class="btn btn-danger remove-course-btn d-block">
-                            <i class="fas fa-times"></i>
-                        </button>
+                </div>
+                
+                <!-- ส่วนกรอกรายวิชาเอง -->
+                <div class="custom-course-container" style="display: none;">
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">รหัสวิชา <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control custom-course-code" name="custom_course_code[INDEX]" placeholder="เช่น 20001-1001">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">ชื่อรายวิชา <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control custom-course-name" name="custom_course_name[INDEX]" placeholder="เช่น ภาษาไทยพื้นฐาน">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">ครูประจำวิชา <span class="text-danger">*</span></label>
+                            <select class="form-select teacher-select-custom" name="teacher_id[INDEX]">
+                                <option value="">-- เลือกครูประจำวิชา --</option>
+                                <?php foreach ($all_teachers as $teacher_item): ?>
+                                <option value="<?php echo $teacher_item['id']; ?>">
+                                    <?php echo $teacher_item['name_prefix'] . $teacher_item['first_name'] . ' ' . $teacher_item['last_name']; ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label class="form-label">จำนวนชั่วโมงทฤษฎี</label>
+                            <input type="number" class="form-control custom-theory-hours" name="custom_theory_hours[INDEX]" min="0" value="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">จำนวนชั่วโมงปฏิบัติ</label>
+                            <input type="number" class="form-control custom-practice-hours" name="custom_practice_hours[INDEX]" min="0" value="0">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">หน่วยกิต</label>
+                            <input type="number" class="form-control custom-credits" name="custom_credits[INDEX]" min="0" value="0">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">จำนวนชั่วโมงรวม</label>
+                            <input type="number" class="form-control custom-total-hours" name="custom_total_hours[INDEX]" min="0" value="0">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button" class="btn btn-danger remove-course-btn d-block">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -428,117 +702,264 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- Bootstrap JS -->
     <script src="assets/js/bootstrap.bundle.min.js"></script>
     <!-- Select2 JS -->
-    <script src="assets/js/select2.min.js"></script>
     <!-- Sweet Alert -->
-    <script src="assets/js/sweetalert2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <script>
-        $(document).ready(function() {
-            // Function to initialize Select2 on course and teacher selects
-            function initializeSelects() {
-                $('.course-select').select2({
-                    placeholder: "เลือกรายวิชา",
-                    width: '100%'
+       /**
+ * JavaScript แก้ไขเรื่องการเพิ่มรายวิชา
+ * ปรับให้สามารถเพิ่มรายวิชาใหม่และกรอกข้อมูลได้ถูกต้อง
+ */
+$(document).ready(function() {
+    // Function to initialize Select2 on dropdowns
+    function initializeSelects() {
+        $('.course-select, .teacher-select, .teacher-select-custom').select2({
+            placeholder: "เลือกรายการ",
+            width: '100%',
+            dropdownParent: $('body')
+        });
+    }
+    
+    // Initialize Select2 dropdowns on page load
+    initializeSelects();
+    
+    // Update course details when course is selected
+    $(document).on('change', '.course-select', function() {
+        var selectedOption = $(this).find('option:selected');
+        var container = $(this).closest('.select-course-container');
+        
+        // Get course details from data attributes
+        var theory = selectedOption.data('theory') || '';
+        var practice = selectedOption.data('practice') || '';
+        var credit = selectedOption.data('credit') || '';
+        var hours = selectedOption.data('hours') || '';
+        
+        // Update fields
+        container.find('.theory-hours').val(theory);
+        container.find('.practice-hours').val(practice);
+        container.find('.credits').val(credit);
+        container.find('.total-hours').val(hours);
+    });
+    
+    // คำนวณชั่วโมงรวมจากทฤษฎีและปฏิบัติสำหรับรายวิชาที่กรอกเอง
+    $(document).on('input', '.custom-theory-hours, .custom-practice-hours', function() {
+        var container = $(this).closest('.custom-course-container');
+        var theory = parseInt(container.find('.custom-theory-hours').val()) || 0;
+        var practice = parseInt(container.find('.custom-practice-hours').val()) || 0;
+        var total = theory + practice;
+        
+        container.find('.custom-total-hours').val(total);
+    });
+    
+    // Toggle between select course and custom course
+    $(document).on('change', '.course-type-radio', function() {
+        var container = $(this).closest('.course-item');
+        var value = $(this).val();
+        
+        if (value === 'select') {
+            container.find('.select-course-container').show();
+            container.find('.custom-course-container').hide();
+            
+            // Enable required on select fields
+            container.find('.course-select').prop('required', true);
+            container.find('.teacher-select').prop('required', true);
+            
+            // Disable required on custom fields
+            container.find('.custom-course-code').prop('required', false);
+            container.find('.custom-course-name').prop('required', false);
+            container.find('.teacher-select-custom').prop('required', false);
+        } else {
+            container.find('.select-course-container').hide();
+            container.find('.custom-course-container').show();
+            
+            // Disable required on select fields
+            container.find('.course-select').prop('required', false);
+            container.find('.teacher-select').prop('required', false);
+            
+            // Enable required on custom fields
+            container.find('.custom-course-code').prop('required', true);
+            container.find('.custom-course-name').prop('required', true);
+            container.find('.teacher-select-custom').prop('required', true);
+        }
+    });
+    
+    // Add course button click - FIXED VERSION
+    $('.add-course-btn').click(function() {
+        // Get current index - count existing items to ensure unique index
+        var currentIndex = $('.course-item').length;
+        
+        // Clone template HTML
+        var template = $('#courseItemTemplate').html();
+        
+        // Replace all INDEX placeholders with the current index
+        template = template.replace(/INDEX/g, currentIndex);
+        
+        // Append to container
+        $('.course-items').append(template);
+        
+        // Initialize newly added elements
+        var newItem = $('.course-items .course-item:last');
+        
+        // Destroy and re-initialize Select2 for the new elements
+        newItem.find('.course-select, .teacher-select, .teacher-select-custom').select2({
+            placeholder: "เลือกรายการ",
+            width: '100%',
+            dropdownParent: $('body')
+        });
+        
+        // Set up course type toggles for the new item
+        newItem.find('.course-type-radio').first().prop('checked', true);
+        newItem.find('.select-course-container').show();
+        newItem.find('.custom-course-container').hide();
+    });
+    
+    // Remove course button click (uses event delegation for dynamic elements)
+    $(document).on('click', '.remove-course-btn', function() {
+        // Only allow removal if there's more than one course item
+        if ($('.course-item').length > 1) {
+            $(this).closest('.course-item').remove();
+            
+            // Re-index all course items
+            $('.course-item').each(function(index) {
+                var courseItem = $(this);
+                
+                // Update name attributes for all form elements
+                courseItem.find('[name^="course_type["], [name^="course_id["], [name^="teacher_id["], [name^="theory_hours["], [name^="practice_hours["], [name^="credits["], [name^="total_hours["], [name^="custom_course_code["], [name^="custom_course_name["], [name^="custom_theory_hours["], [name^="custom_practice_hours["], [name^="custom_credits["], [name^="custom_total_hours["]').each(function() {
+                    var name = $(this).attr('name').replace(/\[\d+\]/, '[' + index + ']');
+                    $(this).attr('name', name);
                 });
                 
-                $('.teacher-select').select2({
-                    placeholder: "เลือกครูประจำวิชา",
-                    width: '100%'
+                // Update ID attributes for radio buttons
+                courseItem.find('[id^="course_type_select_"], [id^="course_type_custom_"]').each(function() {
+                    var id = $(this).attr('id').replace(/\d+$/, index);
+                    $(this).attr('id', id);
                 });
+                
+                // Update for attributes for labels
+                courseItem.find('label[for^="course_type_select_"], label[for^="course_type_custom_"]').each(function() {
+                    var forAttr = $(this).attr('for').replace(/\d+$/, index);
+                    $(this).attr('for', forAttr);
+                });
+            });
+        } else {
+            Swal.fire({
+                title: 'ไม่สามารถลบได้',
+                text: 'ต้องมีรายวิชาอย่างน้อย 1 รายวิชา',
+                icon: 'warning',
+                confirmButtonText: 'ตกลง'
+            });
+        }
+    });
+
+    // Form validation before submission
+    $('#courseRequestForm').submit(function(e) {
+        var isValid = true;
+        var errorMessages = [];
+        
+        // ตรวจสอบแต่ละรายวิชา
+        $('.course-item').each(function(index) {
+            var courseItem = $(this);
+            var courseType = courseItem.find('input[name^="course_type"]:checked').val();
+            
+            if (courseType === 'select') {
+                // ตรวจสอบรายวิชาที่เลือกจากระบบ
+                if (!courseItem.find('.course-select').val()) {
+                    isValid = false;
+                    errorMessages.push('กรุณาเลือกรายวิชาที่ ' + (index + 1));
+                }
+                
+                if (!courseItem.find('.teacher-select').val()) {
+                    isValid = false;
+                    errorMessages.push('กรุณาเลือกครูประจำวิชาที่ ' + (index + 1));
+                }
+            } else {
+                // ตรวจสอบรายวิชาที่กรอกเอง
+                if (!courseItem.find('.custom-course-code').val()) {
+                    isValid = false;
+                    errorMessages.push('กรุณากรอกรหัสวิชาที่ ' + (index + 1));
+                }
+                
+                if (!courseItem.find('.custom-course-name').val()) {
+                    isValid = false;
+                    errorMessages.push('กรุณากรอกชื่อรายวิชาที่ ' + (index + 1));
+                }
+                
+                if (!courseItem.find('.teacher-select-custom').val()) {
+                    isValid = false;
+                    errorMessages.push('กรุณาเลือกครูประจำวิชาที่ ' + (index + 1));
+                }
+            }
+        });
+        
+        // แสดงข้อความแจ้งเตือนถ้ามีข้อผิดพลาด
+        if (!isValid) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'ข้อมูลไม่ครบถ้วน',
+                html: errorMessages.join('<br>'),
+                icon: 'error',
+                confirmButtonText: 'ตกลง'
+            });
+            return;
+        }
+        
+        // Check for duplicate courses
+        var courseCodes = [];
+        var hasDuplicate = false;
+        
+        $('.course-item').each(function() {
+            var courseItem = $(this);
+            var courseType = courseItem.find('input[name^="course_type"]:checked').val();
+            var courseCode = '';
+            
+            if (courseType === 'select') {
+                var courseId = courseItem.find('.course-select').val();
+                if (courseId) {
+                    var courseText = courseItem.find('.course-select option:selected').text();
+                    courseCode = courseText.split(' - ')[0];
+                }
+            } else {
+                courseCode = courseItem.find('.custom-course-code').val();
             }
             
-            // Initialize Select2 on page load
-            initializeSelects();
+            if (courseCode && courseCodes.includes(courseCode)) {
+                hasDuplicate = true;
+                return false; // break the loop
+            }
             
-            // Update course details when course is selected
-            $(document).on('change', '.course-select', function() {
-                var selectedOption = $(this).find('option:selected');
-                var container = $(this).closest('.course-item');
-                
-                // Get course details from data attributes
-                var theory = selectedOption.data('theory');
-                var practice = selectedOption.data('practice');
-                var credit = selectedOption.data('credit');
-                var hours = selectedOption.data('hours');
-                
-                // Update fields
-                container.find('.theory-hours').val(theory);
-                container.find('.practice-hours').val(practice);
-                container.find('.credits').val(credit);
-                container.find('.total-hours').val(hours);
-            });
-            
-            // Add course button click
-            $('.add-course-btn').click(function() {
-                // Get template
-                var template = $('#courseItemTemplate').html();
-                
-                // Add template to container
-                $('.course-items').append(template);
-                
-                // Initialize Select2 for new elements
-                initializeSelects();
-            });
-            
-            // Remove course button click
-            $(document).on('click', '.remove-course-btn', function() {
-                $(this).closest('.course-item').remove();
-            });
-            
-            // Form submission validation
-            $('#courseRequestForm').submit(function(e) {
-                // Check if at least one course is selected
-                if ($('.course-item').length === 0) {
-                    e.preventDefault();
-                    Swal.fire({
-                        title: 'ข้อผิดพลาด',
-                        text: 'กรุณาเพิ่มรายวิชาอย่างน้อย 1 รายวิชา',
-                        icon: 'error',
-                        confirmButtonText: 'ตกลง'
-                    });
-                    return;
-                }
-                
-                // Check for duplicate courses
-                var courses = [];
-                var hasDuplicate = false;
-                
-                $('.course-select').each(function() {
-                    var courseId = $(this).val();
-                    if (courseId && courses.includes(courseId)) {
-                        hasDuplicate = true;
-                        return false; // Break the loop
-                    }
-                    courses.push(courseId);
-                });
-                
-                if (hasDuplicate) {
-                    e.preventDefault();
-                    Swal.fire({
-                        title: 'ข้อผิดพลาด',
-                        text: 'มีการเลือกรายวิชาซ้ำกัน กรุณาตรวจสอบข้อมูล',
-                        icon: 'error',
-                        confirmButtonText: 'ตกลง'
-                    });
-                    return;
-                }
-                
-                // Confirm submission
-                e.preventDefault();
-                Swal.fire({
-                    title: 'ยืนยันการส่งคำขอ',
-                    text: 'คุณต้องการส่งคำขอเปิดรายวิชานี้ใช่หรือไม่?',
-                    icon: 'question',
-                    showCancelButton: true,
-                    confirmButtonText: 'ใช่, ส่งคำขอ',
-                    cancelButtonText: 'ยกเลิก'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        $(this).unbind('submit').submit();
-                    }
-                });
-            });
+            if (courseCode) {
+                courseCodes.push(courseCode);
+            }
         });
+        
+        if (hasDuplicate) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'ข้อผิดพลาด',
+                text: 'มีการเลือกรายวิชาซ้ำกัน กรุณาตรวจสอบข้อมูล',
+                icon: 'error',
+                confirmButtonText: 'ตกลง'
+            });
+            return;
+        }
+        
+        // Confirm submission
+        e.preventDefault();
+        Swal.fire({
+            title: 'ยืนยันการส่งคำขอ',
+            text: 'คุณต้องการส่งคำขอเปิดรายวิชานี้ใช่หรือไม่?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'ใช่, ส่งคำขอ',
+            cancelButtonText: 'ยกเลิก'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $(this).unbind('submit').submit();
+            }
+        });
+    });
+});
     </script>
 </body>
 </html>

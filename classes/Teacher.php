@@ -170,28 +170,6 @@ class Teacher {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     
-    // Search teachers
-    public function searchTeachers($keywords) {
-        // Query to search teachers
-        $query = "SELECT * FROM " . $this->table_name . " 
-                  WHERE name_prefix LIKE :keywords OR first_name LIKE :keywords OR last_name LIKE :keywords OR department LIKE :keywords 
-                  ORDER BY department ASC, first_name ASC";
-        
-        // Prepare statement
-        $stmt = $this->conn->prepare($query);
-        
-        // Sanitize and bind keywords
-        $keywords = htmlspecialchars(strip_tags($keywords));
-        $keywords = "%{$keywords}%";
-        $stmt->bindParam(':keywords', $keywords);
-        
-        // Execute query
-        $stmt->execute();
-        
-        // Return all rows
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-    
     // Get all departments
     public function getAllDepartments() {
         // Query to get all distinct departments

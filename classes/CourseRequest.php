@@ -6,6 +6,7 @@ class CourseRequest {
     private $items_table = "course_request_items";
     private $status_logs_table = "status_logs";
     private $students_table = "students";
+    private $temp_students_table = "temp_students"; 
     private $courses_table = "courses";
     private $teachers_table = "teachers";
     
@@ -64,7 +65,7 @@ class CourseRequest {
                 $this->id = $this->conn->lastInsertId();
                 
                 // Log initial status
-                $this->logStatusChange($this->student_id, $this->status, 'การยื่นคำขอเปิดรายวิชา');
+                $this->logStatusChange($this->student_id, $this->status, 'ยื่นคำขอเปิดรายวิชา');
                 
                 // Commit transaction
                 $this->conn->commit();
@@ -183,7 +184,7 @@ class CourseRequest {
     
     // Get course request by ID
     public function getRequestById() {
-        // Query to read single course request with student details
+        // Try to check in registered students first
         $query = "SELECT cr.*, 
                   s.student_code, 
                   s.name_prefix, 
@@ -206,6 +207,27 @@ class CourseRequest {
         
         // Execute query
         $stmt->execute();
+        
+        // If no result, try with temp students
+        if ($stmt->rowCount() === 0) {
+            $query = "SELECT cr.*, 
+                      ts.student_code, 
+                      ts.name_prefix, 
+                      ts.first_name, 
+                      ts.last_name, 
+                      CONCAT(ts.name_prefix, ts.first_name, ' ', ts.last_name) as student_name,
+                      ts.education_level, 
+                      ts.year, 
+                      ts.major, 
+                      ts.phone_number
+                      FROM " . $this->table_name . " cr
+                      LEFT JOIN " . $this->temp_students_table . " ts ON cr.student_id = ts.id
+                      WHERE cr.id = :id";
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':id', $this->id);
+            $stmt->execute();
+        }
         
         // Check if any row returned
         if ($stmt->rowCount() > 0) {
@@ -252,11 +274,13 @@ class CourseRequest {
                   CASE 
                     WHEN u.role = 'admin' THEN 'ผู้ดูแลระบบ'
                     WHEN s.id IS NOT NULL THEN CONCAT(s.name_prefix, s.first_name, ' ', s.last_name)
+                    WHEN ts.id IS NOT NULL THEN CONCAT(ts.name_prefix, ts.first_name, ' ', ts.last_name)
                     ELSE u.username
                   END as user_name
                   FROM " . $this->status_logs_table . " sl
                   LEFT JOIN users u ON sl.user_id = u.id
                   LEFT JOIN " . $this->students_table . " s ON sl.user_id = s.user_id
+                  LEFT JOIN " . $this->temp_students_table . " ts ON sl.user_id = ts.id
                   WHERE sl.course_request_id = :course_request_id
                   ORDER BY sl.created_at DESC";
         
@@ -275,13 +299,17 @@ class CourseRequest {
     
     // Get all course requests
     public function getAllRequests() {
-        // Query to get all course requests with student details and course count
+        // Query to get all course requests
         $query = "SELECT cr.*, 
-                  s.student_code, 
-                  CONCAT(s.name_prefix, s.first_name, ' ', s.last_name) as student_name,
+                  COALESCE(s.student_code, ts.student_code) as student_code, 
+                  CASE 
+                    WHEN s.id IS NOT NULL THEN CONCAT(s.name_prefix, s.first_name, ' ', s.last_name)
+                    ELSE CONCAT(ts.name_prefix, ts.first_name, ' ', ts.last_name)
+                  END as student_name,
                   (SELECT COUNT(*) FROM " . $this->items_table . " WHERE course_request_id = cr.id) as course_count
                   FROM " . $this->table_name . " cr
                   LEFT JOIN " . $this->students_table . " s ON cr.student_id = s.id
+                  LEFT JOIN " . $this->temp_students_table . " ts ON cr.student_id = ts.id
                   ORDER BY cr.id DESC";
         
         // Prepare statement
@@ -316,13 +344,43 @@ class CourseRequest {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     
+    // Get course requests by student code
+    public function getRequestsByStudentCode($student_code) {
+        // First, get student ID
+        $query_student = "SELECT id FROM " . $this->students_table . " WHERE student_code = :student_code
+                          UNION
+                          SELECT id FROM " . $this->temp_students_table . " WHERE student_code = :student_code";
+        
+        $stmt_student = $this->conn->prepare($query_student);
+        $stmt_student->bindParam(':student_code', $student_code);
+        $stmt_student->execute();
+        
+        if ($stmt_student->rowCount() === 0) {
+            return [];
+        }
+        
+        $results = [];
+        while ($row = $stmt_student->fetch(PDO::FETCH_ASSOC)) {
+            $student_id = $row['id'];
+            
+            // Get requests by student ID
+            $results = array_merge($results, $this->getRequestsByStudentId($student_id));
+        }
+        
+        return $results;
+    }
+    
     // Get recent course requests
     public function getRecentRequests($limit = 5) {
         // Query to get recent course requests with student details
         $query = "SELECT cr.*, 
-                  CONCAT(s.name_prefix, s.first_name, ' ', s.last_name) as student_name
+                  CASE 
+                    WHEN s.id IS NOT NULL THEN CONCAT(s.name_prefix, s.first_name, ' ', s.last_name)
+                    ELSE CONCAT(ts.name_prefix, ts.first_name, ' ', ts.last_name)
+                  END as student_name
                   FROM " . $this->table_name . " cr
                   LEFT JOIN " . $this->students_table . " s ON cr.student_id = s.id
+                  LEFT JOIN " . $this->temp_students_table . " ts ON cr.student_id = ts.id
                   ORDER BY cr.id DESC
                   LIMIT :limit";
         

@@ -17,34 +17,7 @@ class User {
         $this->conn = $db;
     }
     
-    // Login user
-    public function login() {
-        // Prepare query to check if username exists
-        $query = "SELECT id, username, password, role FROM " . $this->table_name . " WHERE username = :username";
-        $stmt = $this->conn->prepare($query);
-        
-        // Bind parameters
-        $stmt->bindParam(':username', $this->username);
-        
-        // Execute query
-        $stmt->execute();
-        
-        // Check if user exists
-        if ($stmt->rowCount() > 0) {
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            // Verify password
-            if (password_verify($this->password, $row['password'])) {
-                // Set user properties
-                $this->id = $row['id'];
-                $this->role = $row['role'];
-                
-                return true;
-            }
-        }
-        
-        return false;
-    }
+
     
     // Get user by ID
     public function getUserById() {
@@ -73,40 +46,95 @@ class User {
         
         return false;
     }
+   
     
-    // Create new user
-    public function create() {
-        // Query to insert user
-        $query = "INSERT INTO " . $this->table_name . " 
-                  (username, password, role, created_at, updated_at) 
-                  VALUES 
-                  (:username, :password, :role, NOW(), NOW())";
+    // แก้ไขฟังก์ชัน login() ในไฟล์ classes/User.php
+public function login() {
+    // Prepare query to check if username exists
+    $query = "SELECT id, username, password, role FROM " . $this->table_name . " WHERE username = :username";
+    $stmt = $this->conn->prepare($query);
+    
+    // Bind parameters
+    $stmt->bindParam(':username', $this->username);
+    
+    // Execute query
+    $stmt->execute();
+    
+    // Check if user exists
+    if ($stmt->rowCount() > 0) {
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        // Prepare statement
-        $stmt = $this->conn->prepare($query);
-        
-        // Sanitize input
-        $this->username = htmlspecialchars(strip_tags($this->username));
-        $this->role = htmlspecialchars(strip_tags($this->role));
-        
-        // Hash password
-        $password_hash = password_hash($this->password, PASSWORD_BCRYPT);
-        
-        // Bind parameters
-        $stmt->bindParam(':username', $this->username);
-        $stmt->bindParam(':password', $password_hash);
-        $stmt->bindParam(':role', $this->role);
-        
-        // Execute query
-        if ($stmt->execute()) {
-            // Get the last inserted ID
-            $this->id = $this->conn->lastInsertId();
+        // Verify password using MD5 instead of password_verify
+        if (md5($this->password) === $row['password']) {
+            // Set user properties
+            $this->id = $row['id'];
+            $this->role = $row['role'];
+            
             return true;
         }
-        
-        return false;
     }
     
+    return false;
+}
+
+// แก้ไขฟังก์ชัน create() ในไฟล์ classes/User.php
+public function create() {
+    // Query to insert user
+    $query = "INSERT INTO " . $this->table_name . " 
+              (username, password, role, created_at, updated_at) 
+              VALUES 
+              (:username, :password, :role, NOW(), NOW())";
+    
+    // Prepare statement
+    $stmt = $this->conn->prepare($query);
+    
+    // Sanitize input
+    $this->username = htmlspecialchars(strip_tags($this->username));
+    $this->role = htmlspecialchars(strip_tags($this->role));
+    
+    // Create MD5 hash for password
+    $password_hash = md5($this->password);
+    
+    // Bind parameters
+    $stmt->bindParam(':username', $this->username);
+    $stmt->bindParam(':password', $password_hash);
+    $stmt->bindParam(':role', $this->role);
+    
+    // Execute query
+    if ($stmt->execute()) {
+        // Get the last inserted ID
+        $this->id = $this->conn->lastInsertId();
+        return true;
+    }
+    
+    return false;
+}
+
+// แก้ไขฟังก์ชัน updatePassword() ในไฟล์ classes/User.php
+public function updatePassword() {
+    // Query to update password
+    $query = "UPDATE " . $this->table_name . " 
+              SET password = :password, updated_at = NOW()
+              WHERE id = :id";
+    
+    // Prepare statement
+    $stmt = $this->conn->prepare($query);
+    
+    // Hash password with MD5
+    $password_hash = md5($this->password);
+    
+    // Bind parameters
+    $stmt->bindParam(':password', $password_hash);
+    $stmt->bindParam(':id', $this->id);
+    
+    // Execute query
+    if ($stmt->execute()) {
+        return true;
+    }
+    
+    return false;
+}
+
     // Update user
     public function update() {
         // Query to update user
@@ -135,30 +163,7 @@ class User {
         return false;
     }
     
-    // Update password
-    public function updatePassword() {
-        // Query to update password
-        $query = "UPDATE " . $this->table_name . " 
-                  SET password = :password, updated_at = NOW()
-                  WHERE id = :id";
-        
-        // Prepare statement
-        $stmt = $this->conn->prepare($query);
-        
-        // Hash password
-        $password_hash = password_hash($this->password, PASSWORD_BCRYPT);
-        
-        // Bind parameters
-        $stmt->bindParam(':password', $password_hash);
-        $stmt->bindParam(':id', $this->id);
-        
-        // Execute query
-        if ($stmt->execute()) {
-            return true;
-        }
-        
-        return false;
-    }
+
     
     // Delete user
     public function delete() {
