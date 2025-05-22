@@ -1,26 +1,25 @@
 <?php
 // api/student_info.php
-// API สำหรับดึงข้อมูลนักเรียนจากรหัสนักเรียน
+// API สำหรับค้นหาข้อมูลนักเรียนจากรหัสนักเรียน
 
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
+// เชื่อมต่อฐานข้อมูล
 require_once '../config/db_connect.php';
 require_once '../config/functions.php';
 
-$response = [
-    'success' => false,
-    'data' => null,
-    'message' => ''
-];
+// ตรวจสอบการส่งข้อมูล
+if (!isset($_POST['student_code']) || empty($_POST['student_code'])) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'กรุณาระบุรหัสนักเรียน'
+    ]);
+    exit;
+}
+
+$student_code = $_POST['student_code'];
 
 try {
-    // ตรวจสอบว่ามีการส่งรหัสนักเรียนมาหรือไม่
-    if (!isset($_POST['student_code']) || empty($_POST['student_code'])) {
-        throw new Exception('กรุณาระบุรหัสนักเรียน');
-    }
-    
-    $student_code = $_POST['student_code'];
-    
     // ค้นหาข้อมูลนักเรียน
     $stmt = $pdo->prepare("
         SELECT s.*, d.department_name 
@@ -31,16 +30,23 @@ try {
     $stmt->execute(['student_code' => $student_code]);
     $student = $stmt->fetch();
     
-    // ตรวจสอบว่าพบข้อมูลหรือไม่
     if ($student) {
-        $response['success'] = true;
-        $response['data'] = $student;
-        $response['message'] = 'ดึงข้อมูลนักเรียนสำเร็จ';
+        echo json_encode([
+            'success' => true,
+            'message' => 'พบข้อมูลนักเรียน',
+            'data' => $student
+        ]);
     } else {
-        $response['message'] = 'ไม่พบข้อมูลนักเรียนจากรหัสที่ระบุ';
+        echo json_encode([
+            'success' => false,
+            'message' => 'ไม่พบข้อมูลนักเรียนจากรหัสที่ระบุ'
+        ]);
     }
-} catch (Exception $e) {
-    $response['message'] = $e->getMessage();
+    
+} catch (PDOException $e) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'เกิดข้อผิดพลาดในการค้นหา: ' . $e->getMessage()
+    ]);
 }
-
-echo json_encode($response);
+?>
