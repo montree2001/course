@@ -1,263 +1,618 @@
 /* assets/css/mobile.css */
-/* CSS สำหรับรองรับการแสดงผลบนอุปกรณ์มือถือ */
+/* CSS สำหรับรองรับการแสดงผลบนมือถือ */
 
-/* ปรับขนาดฟอนต์พื้นฐานสำหรับมือถือ */
-@media (max-width: 767.98px) {
-    body {
-        font-size: 16px;
-    }
-    
-    h1, .h1 {
-        font-size: 1.8rem;
-    }
-    
-    h2, .h2 {
-        font-size: 1.5rem;
-    }
-    
-    h3, .h3 {
-        font-size: 1.3rem;
-    }
-    
-    h4, .h4 {
-        font-size: 1.2rem;
-    }
-    
-    h5, .h5 {
-        font-size: 1.1rem;
-    }
-    
-    /* เพิ่มขนาดปุ่มบนมือถือ */
-    .btn {
-        padding: 0.5rem 1rem;
-        font-size: 1rem;
-    }
-    
-    /* ปรับขนาด margin/padding สำหรับมือถือ */
-    .container {
-        padding-left: 15px;
-        padding-right: 15px;
-    }
-    
-    .row {
-        margin-left: -10px;
-        margin-right: -10px;
-    }
-    
-    .col, [class*="col-"] {
-        padding-left: 10px;
-        padding-right: 10px;
-    }
-    
-    /* ปรับระยะห่างระหว่าง section */
-    section, .section {
-        margin-bottom: 2rem;
-    }
-    
-    /* ปรับขนาดแท็บในฟอร์ม */
-    .nav-tabs .nav-link {
-        padding: 0.75rem 1rem;
-    }
-    
-    /* ปรับการแสดงผลของตาราง */
-    .table-responsive {
-        border: 0;
-    }
-
-    /* ปรับขนาดไอคอน */
-    .feature-icon {
-        width: 3rem;
-        height: 3rem;
-        font-size: 1.5rem;
-    }
-    
-    /* ปรับการแสดงผลการ์ด */
-    .card {
-        margin-bottom: 1rem;
-    }
-    
-    .card-body {
-        padding: 1rem;
-    }
-    
-    /* ปรับแบบฟอร์ม */
-    .form-label {
-        margin-bottom: 0.25rem;
-    }
-    
-    .form-control {
-        padding: 0.5rem 0.75rem;
-        font-size: 1rem;
-    }
-    
-    /* เพิ่มระยะห่างระหว่างกลุ่มฟอร์ม */
-    .form-group, .mb-3 {
-        margin-bottom: 1rem !important;
-    }
-    
-    /* ปรับฟุตเตอร์ */
-    footer {
-        text-align: center;
-    }
-    
-    footer .row > div {
-        margin-bottom: 1.5rem;
-    }
-    
-    /* ซ่อนข้อมูลที่ไม่จำเป็นในมือถือ */
-    .d-none-mobile {
-        display: none !important;
-    }
-    
-    /* ปรับการแสดงผลของ modal */
-    .modal-dialog {
-        margin: 0.5rem;
-    }
-    
-    /* ปรับขนาดปุ่มในกลุ่ม */
-    .btn-group .btn {
-        padding: 0.4rem 0.6rem;
-    }
-    
-    /* ปรับการแสดงผลฟอร์มเพิ่มรายวิชา */
-    .course-item {
-        padding: 0.75rem !important;
-    }
-    
-    .btn-remove-course {
-        margin-top: 0.5rem !important;
-        width: 100%;
-    }
-
-    /* ปรับการแสดงผลของ Select2 */
-    .select2-container--bootstrap-5 .select2-selection {
-        min-height: 38px;
-        padding: 0.25rem 0.5rem;
-    }
-
-    /* ปรับขนาดแบดจ์ */
-    .status-badge {
-        width: 100%;
-        display: block;
-        margin-bottom: 0.5rem;
-    }
-
-    /* ปรับการแสดงผลในตาราง */
-    .table thead th {
-        white-space: nowrap;
-    }
-
-    /* ปรับการแสดงผลของแบบฟอร์ม */
-    .student-item .mb-3 {
-        margin-bottom: 0.5rem !important;
-    }
+/* Reset และ Base Styles */
+* {
+    box-sizing: border-box;
 }
 
-/* เพิ่มระยะห่างระหว่างฟอร์มบนมือถือ */
-@media (max-width: 575.98px) {
-    .form-section {
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid #eee;
-    }
-    
-    .course-item {
-        margin-bottom: 1rem !important;
-    }
-    
-    /* ปรับขนาดปุ่มให้ใหญ่ขึ้น */
-    .btn-lg {
-        width: 100%;
-        margin-bottom: 0.5rem;
-    }
-    
-    /* ปรับขนาดปุ่มกลุ่ม */
-    .d-md-flex.justify-content-md-end {
-        display: block !important;
-    }
-    
-    .d-md-flex.justify-content-md-end .btn {
-        width: 100%;
-        margin-right: 0 !important;
-        margin-bottom: 0.5rem;
-    }
-    
-    /* ปรับการแสดงผลของแท็บ */
-    .nav-tabs {
-        overflow-x: auto;
-        flex-wrap: nowrap;
-        white-space: nowrap;
-        display: -webkit-box;
-        -webkit-box-orient: horizontal;
-    }
-    
-    .nav-tabs .nav-link {
-        display: inline-block;
-    }
-    
-    /* ปรับการแสดงผลของตาราง */
-    table.dataTable {
-        width: 100% !important;
-    }
+body {
+    font-family: 'Sarabun', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    background-color: #f8f9fa;
 }
 
-/* ปรับการแสดงผลของ DataTables บนมือถือ */
-@media (max-width: 767.98px) {
-    .dataTables_length, .dataTables_filter {
-        float: none;
-        text-align: left;
+/* Container ที่รองรับมือถือ */
+.mobile-container {
+    width: 100%;
+    max-width: 100%;
+    padding: 0 15px;
+    margin: 0 auto;
+}
+
+/* Card สำหรับมือถือ */
+.mobile-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 15px;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mobile-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.mobile-card-header {
+    background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+    color: white;
+    padding: 15px;
+    font-weight: 600;
+    position: relative;
+}
+
+.mobile-card-body {
+    padding: 15px;
+}
+
+/* Form Elements สำหรับมือถือ */
+.mobile-form-group {
+    margin-bottom: 20px;
+}
+
+.mobile-form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #495057;
+    font-size: 14px;
+}
+
+.mobile-form-control {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 16px; /* ป้องกันการ zoom บน iOS */
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    background-color: #fff;
+}
+
+.mobile-form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    outline: none;
+}
+
+.mobile-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 12px center;
+    background-repeat: no-repeat;
+    background-size: 16px 12px;
+    padding-right: 40px;
+    appearance: none;
+}
+
+/* Button สำหรับมือถือ */
+.mobile-btn {
+    display: inline-block;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 48px; /* มาตรฐานการสัมผัส */
+    line-height: 1.2;
+}
+
+.mobile-btn-primary {
+    background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+    color: white;
+}
+
+.mobile-btn-primary:hover {
+    background: linear-gradient(135deg, #0b5ed7, #0a58ca);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+.mobile-btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.mobile-btn-success {
+    background: linear-gradient(135deg, #198754, #157347);
+    color: white;
+}
+
+.mobile-btn-warning {
+    background: linear-gradient(135deg, #ffc107, #ffb300);
+    color: #000;
+}
+
+.mobile-btn-danger {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+}
+
+.mobile-btn-block {
+    width: 100%;
+    display: block;
+}
+
+.mobile-btn-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.mobile-btn-group .mobile-btn {
+    flex: 1;
+}
+
+/* Badge สำหรับมือถือ */
+.mobile-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 20px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.mobile-badge-success {
+    background-color: #d1edff;
+    color: #0c5460;
+}
+
+.mobile-badge-warning {
+    background-color: #fff3cd;
+    color: #664d03;
+}
+
+.mobile-badge-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+/* List Group สำหรับมือถือ */
+.mobile-list-group {
+    background-color: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-list-item {
+    padding: 15px;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mobile-list-item:last-child {
+    border-bottom: none;
+}
+
+.mobile-list-item-content {
+    flex: 1;
+}
+
+.mobile-list-item-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #212529;
+}
+
+.mobile-list-item-subtitle {
+    font-size: 12px;
+    color: #6c757d;
+}
+
+.mobile-list-item-action {
+    margin-left: 15px;
+}
+
+/* Timeline สำหรับติดตามสถานะ */
+.mobile-timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+.mobile-timeline-item {
+    position: relative;
+    padding-left: 40px;
+    margin-bottom: 25px;
+}
+
+.mobile-timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    background-color: #e9ecef;
+}
+
+.mobile-timeline-item:last-child::before {
+    display: none;
+}
+
+.mobile-timeline-icon {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: #0d6efd;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    z-index: 1;
+}
+
+.mobile-timeline-icon.completed {
+    background-color: #198754;
+}
+
+.mobile-timeline-icon.current {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.mobile-timeline-content {
+    background-color: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-timeline-title {
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #212529;
+}
+
+.mobile-timeline-description {
+    font-size: 14px;
+    color: #6c757d;
+    margin-bottom: 8px;
+}
+
+.mobile-timeline-date {
+    font-size: 12px;
+    color: #adb5bd;
+}
+
+/* Alert สำหรับมือถือ */
+.mobile-alert {
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.mobile-alert-success {
+    background-color: #d1edff;
+    color: #0c5460;
+    border-left: 4px solid #0dcaf0;
+}
+
+.mobile-alert-warning {
+    background-color: #fff3cd;
+    color: #664d03;
+    border-left: 4px solid #ffc107;
+}
+
+.mobile-alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-left: 4px solid #dc3545;
+}
+
+.mobile-alert-info {
+    background-color: #cff4fc;
+    color: #055160;
+    border-left: 4px solid #0dcaf0;
+}
+
+/* Table responsive สำหรับมือถือ */
+.mobile-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 20px;
+}
+
+.mobile-table {
+    width: 100%;
+    min-width: 600px;
+    background-color: white;
+    border-collapse: collapse;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-table th,
+.mobile-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.mobile-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+}
+
+/* Search และ Filter */
+.mobile-search-container {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.mobile-search-input {
+    width: 100%;
+    padding: 12px 45px 12px 15px;
+    border: 2px solid #e9ecef;
+    border-radius: 25px;
+    font-size: 16px;
+    background-color: white;
+}
+
+.mobile-search-icon {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6c757d;
+}
+
+.mobile-filter-chips {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 15px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 5px 0;
+}
+
+.mobile-filter-chip {
+    background-color: #e9ecef;
+    color: #495057;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mobile-filter-chip.active {
+    background-color: #0d6efd;
+    color: white;
+}
+
+/* Loading Spinner */
+.mobile-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+}
+
+.mobile-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #0d6efd;
+    border-radius: 50%;
+    animation: mobile-spin 1s linear infinite;
+}
+
+@keyframes mobile-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Bottom Navigation */
+.mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: white;
+    border-top: 1px solid #e9ecef;
+    padding: 10px 0;
+    z-index: 1000;
+}
+
+.mobile-bottom-nav-content {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.mobile-bottom-nav-item {
+    text-align: center;
+    color: #6c757d;
+    text-decoration: none;
+    padding: 8px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.mobile-bottom-nav-item.active {
+    color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+.mobile-bottom-nav-icon {
+    font-size: 20px;
+    margin-bottom: 4px;
+    display: block;
+}
+
+.mobile-bottom-nav-text {
+    font-size: 12px;
+}
+
+/* Floating Action Button */
+.mobile-fab {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+    color: white;
+    border: none;
+    font-size: 24px;
+    box-shadow: 0 4px 16px rgba(13, 110, 253, 0.3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 999;
+}
+
+.mobile-fab:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4);
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 576px) {
+    .mobile-container {
+        padding: 0 10px;
+    }
+    
+    .mobile-card-body {
+        padding: 12px;
+    }
+    
+    .mobile-btn-group {
+        flex-direction: column;
+    }
+    
+    .mobile-btn-group .mobile-btn {
+        width: 100%;
         margin-bottom: 10px;
     }
     
-    .dataTables_filter input {
-        width: 100%;
-        margin-left: 0;
+    .mobile-form-control {
+        padding: 10px 12px;
     }
     
-    .dataTables_info, .dataTables_paginate {
-        float: none;
-        text-align: center;
-        margin-top: 10px;
+    .mobile-timeline-item {
+        padding-left: 30px;
     }
     
-    .dataTables_paginate .paginate_button {
-        padding: 0.3em 0.6em;
-    }
-
-    /* เพิ่มความสะดวกในการเลือกรายวิชาบนมือถือ */
-    .select2-dropdown {
-        width: 300px !important;
+    .mobile-timeline-icon {
+        width: 24px;
+        height: 24px;
+        font-size: 12px;
     }
 }
 
-/* ปรับการแสดงผลของไทม์ไลน์สถานะบนมือถือ */
-@media (max-width: 767.98px) {
-    .timeline {
-        padding-left: 1.5rem;
+@media (max-width: 375px) {
+    body {
+        font-size: 13px;
     }
     
-    .timeline-item:before {
-        left: -1.75rem;
-        width: 0.8rem;
-        height: 0.8rem;
+    .mobile-card-header {
+        padding: 12px;
     }
     
-    .timeline-date {
-        display: block;
-        margin-top: 5px;
+    .mobile-card-body {
+        padding: 10px;
+    }
+    
+    .mobile-btn {
+        padding: 10px 20px;
+        font-size: 14px;
     }
 }
 
-/* ปรับการแสดงผลของตารางเรียนบนมือถือ */
-@media (max-width: 767.98px) {
-    .day-schedule {
-        margin-bottom: 1.5rem;
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #121212;
+        color: #ffffff;
     }
     
-    .schedule-card .col-md-2,
-    .schedule-card .col-md-8,
-    .schedule-card .col-md-2.text-end {
-        text-align: left !important;
-        margin-bottom: 0.5rem;
+    .mobile-card {
+        background-color: #1e1e1e;
+        color: #ffffff;
+    }
+    
+    .mobile-form-control {
+        background-color: #2d2d2d;
+        border-color: #404040;
+        color: #ffffff;
+    }
+    
+    .mobile-table {
+        background-color: #1e1e1e;
+        color: #ffffff;
+    }
+    
+    .mobile-table th {
+        background-color: #2d2d2d;
+    }
+}
+
+/* Animation Classes */
+.mobile-fade-in {
+    animation: mobile-fade-in 0.3s ease-in;
+}
+
+@keyframes mobile-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.mobile-slide-up {
+    animation: mobile-slide-up 0.3s ease-out;
+}
+
+@keyframes mobile-slide-up {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+/* Print Styles */
+@media print {
+    .mobile-bottom-nav,
+    .mobile-fab,
+    .mobile-btn,
+    .no-print {
+        display: none !important;
+    }
+    
+    .mobile-card {
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+    
+    body {
+        background-color: white !important;
+        color: black !important;
     }
 }

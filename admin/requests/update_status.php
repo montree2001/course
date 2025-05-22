@@ -12,8 +12,8 @@ require_once '../../config/functions.php';
 // ตรวจสอบการล็อกอิน
 require_once '../check_login.php';
 
-// ตรวจสอบว่าเป็นการส่งข้อมูลแบบ POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+// ตรวจสอบว่าเป็นการส่งข้อมูลแบบ POST หรือ GET
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $_SERVER['REQUEST_METHOD'] !== 'GET') {
     echo json_encode([
         'success' => false,
         'message' => 'การเข้าถึงไม่ถูกต้อง'
@@ -21,17 +21,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// รับข้อมูลจากฟอร์ม
-$request_id = $_POST['request_id'] ?? null;
-$new_status = $_POST['new_status'] ?? null;
-$comment = $_POST['comment'] ?? '';
-$rejection_reason = $_POST['rejection_reason'] ?? '';
+// รับข้อมูลจากฟอร์ม (รองรับทั้ง POST และ GET)
+$request_id = $_REQUEST['request_id'] ?? null;
+$new_status = $_REQUEST['new_status'] ?? null;
+$comment = $_REQUEST['comment'] ?? '';
+$rejection_reason = $_REQUEST['rejection_reason'] ?? '';
 
 // ตรวจสอบข้อมูลที่จำเป็น
 if (empty($request_id) || empty($new_status)) {
     echo json_encode([
         'success' => false,
-        'message' => 'กรุณากรอกข้อมูลที่จำเป็น'
+        'message' => 'กรุณากรอกข้อมูลที่จำเป็น: รหัสคำร้อง=' . $request_id . ', สถานะ=' . $new_status
     ]);
     exit;
 }
@@ -41,7 +41,7 @@ $allowed_statuses = ['อนุมัติ', 'ไม่อนุมัติ'];
 if (!in_array($new_status, $allowed_statuses)) {
     echo json_encode([
         'success' => false,
-        'message' => 'สถานะที่เลือกไม่ถูกต้อง'
+        'message' => 'สถานะที่เลือกไม่ถูกต้อง: ' . $new_status
     ]);
     exit;
 }
@@ -65,13 +65,18 @@ try {
                s.prefix, s.first_name, s.last_name, s.student_code
         FROM course_requests cr
         JOIN students s ON cr.student_id = s.student_id
-        WHERE cr.request_id = :request_id AND cr.status = 'รอดำเนินการ'
+        WHERE cr.request_id = :request_id
     ");
     $stmt->execute(['request_id' => $request_id]);
     $request = $stmt->fetch();
     
     if (!$request) {
-        throw new Exception('ไม่พบคำร้องที่ต้องการอัปเดต หรือคำร้องได้ถูกดำเนินการแล้ว');
+        throw new Exception('ไม่พบคำร้องที่ต้องการอัปเดต รหัสคำร้อง: ' . $request_id);
+    }
+    
+    // ตรวจสอบสถานะปัจจุบัน
+    if ($request['status'] !== 'รอดำเนินการ') {
+        throw new Exception('คำร้องนี้ได้ถูกดำเนินการแล้ว สถานะปัจจุบัน: ' . $request['status']);
     }
     
     // อัปเดตสถานะคำร้อง
@@ -91,7 +96,11 @@ try {
     $sql .= " WHERE request_id = :request_id";
     
     $stmt = $pdo->prepare($sql);
-    $stmt->execute($update_data);
+    $result = $stmt->execute($update_data);
+    
+    if (!$result) {
+        throw new Exception('ไม่สามารถอัปเดตสถานะคำร้องได้');
+    }
     
     // บันทึกประวัติการติดตามสถานะ
     $status_message = '';
@@ -128,13 +137,11 @@ try {
         'request_id' => $request_id,
         'status' => $status_message,
         'comment' => $tracking_comment,
-        'updated_by' => $_SESSION['admin_name']
+        'updated_by' => $_SESSION['admin_name'] ?? 'ผู้ดูแลระบบ'
     ]);
     
     // หากอนุมัติ ให้สร้างแจ้งเตือนสำหรับการจัดตารางเรียน
     if ($new_status === 'อนุมัติ') {
-        // สามารถเพิ่มการสร้างแจ้งเตือนหรือการทำงานเพิ่มเติมได้ตรงนี้
-        
         // บันทึกข้อความเพิ่มเติมในระบบติดตาม
         $stmt = $pdo->prepare("
             INSERT INTO status_tracking (request_id, status, comment, updated_by, created_at)
@@ -153,10 +160,17 @@ try {
     $pdo->commit();
     
     // ส่งผลลัพธ์กลับ
-    echo json_encode([
+    $response = [
         'success' => true,
-        'message' => 'อัปเดตสถานะคำร้องเรียบร้อยแล้ว'
-    ]);
+        'message' => 'อัปเดตสถานะคำร้องเรียบร้อยแล้ว',
+        'data' => [
+            'request_id' => $request_id,
+            'new_status' => $new_status,
+            'student_name' => $request['prefix'] . $request['first_name'] . ' ' . $request['last_name']
+        ]
+    ];
+    
+    echo json_encode($response);
     
 } catch (Exception $e) {
     // Rollback Transaction ในกรณีที่เกิดข้อผิดพลาด
@@ -166,7 +180,22 @@ try {
     
     echo json_encode([
         'success' => false,
-        'message' => $e->getMessage()
+        'message' => $e->getMessage(),
+        'debug_info' => [
+            'request_id' => $request_id,
+            'new_status' => $new_status,
+            'method' => $_SERVER['REQUEST_METHOD']
+        ]
+    ]);
+} catch (PDOException $e) {
+    // Rollback Transaction ในกรณีที่เกิดข้อผิดพลาดฐานข้อมูล
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    
+    echo json_encode([
+        'success' => false,
+        'message' => 'เกิดข้อผิดพลาดฐานข้อมูล: ' . $e->getMessage()
     ]);
 }
 ?>

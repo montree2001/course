@@ -22,6 +22,24 @@ $request = null;
 $request_details = [];
 $tracking_history = [];
 
+// ตรวจสอบว่ามีการส่งข้อมูลอัปเดตสถานะมาหรือไม่ (สำหรับกรณี fallback)
+if (isset($_GET['new_status']) && !empty($_GET['new_status'])) {
+    $new_status = $_GET['new_status'];
+    $comment = $_GET['comment'] ?? '';
+    $rejection_reason = $_GET['rejection_reason'] ?? '';
+    
+    // Redirect ไป update_status.php
+    $params = http_build_query([
+        'request_id' => $request_id,
+        'new_status' => $new_status,
+        'comment' => $comment,
+        'rejection_reason' => $rejection_reason
+    ]);
+    
+    header('Location: update_status.php?' . $params);
+    exit;
+}
+
 try {
     // ดึงข้อมูลคำร้อง
     $stmt = $pdo->prepare("
@@ -320,7 +338,7 @@ try {
                 <h5 class="modal-title" id="updateStatusModalLabel">อัปเดตสถานะคำร้อง #<?php echo $request_id; ?></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="updateStatusForm">
+            <form id="updateStatusForm" method="post" action="update_status.php">
                 <div class="modal-body">
                     <input type="hidden" id="request_id" name="request_id" value="<?php echo $request_id; ?>">
                     
@@ -345,7 +363,7 @@ try {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary">บันทึกการเปลี่ยนแปลง</button>
+                    <button type="submit" class="btn btn-primary" id="submitStatusUpdate">บันทึกการเปลี่ยนแปลง</button>
                 </div>
             </form>
         </div>
@@ -434,19 +452,65 @@ try {
         $('#updateStatusForm').on('submit', function(e) {
             e.preventDefault();
             
-            const formData = new FormData(this);
+            // ตรวจสอบข้อมูล
+            const newStatus = $('#new_status').val();
+            const rejectionReason = $('#rejection_reason').val();
             
-            // Show loading
+            if (!newStatus) {
+                Swal.fire({
+                    title: 'ข้อผิดพลาด!',
+                    text: 'กรุณาเลือกสถานะใหม่',
+                    icon: 'error',
+                    confirmButtonText: 'ตกลง'
+                });
+                return;
+            }
+            
+            if (newStatus === 'ไม่อนุมัติ' && !rejectionReason.trim()) {
+                Swal.fire({
+                    title: 'ข้อผิดพลาด!',
+                    text: 'กรุณากรอกเหตุผลที่ไม่อนุมัติ',
+                    icon: 'error',
+                    confirmButtonText: 'ตกลง'
+                });
+                return;
+            }
+            
+            // แสดยืนยัน
+            const confirmText = newStatus === 'อนุมัติ' ? 'ยืนยันการอนุมัติคำร้องนี้?' : 'ยืนยันการไม่อนุมัติคำร้องนี้?';
+            
+            Swal.fire({
+                title: 'ยืนยันการดำเนินการ',
+                text: confirmText,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'ยืนยัน',
+                cancelButtonText: 'ยกเลิก'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    submitUpdateStatus();
+                }
+            });
+        });
+        
+        // ฟังก์ชันส่งข้อมูลอัปเดตสถานะ
+        function submitUpdateStatus() {
+            const formData = new FormData($('#updateStatusForm')[0]);
+            
+            // แสดง loading
             Swal.fire({
                 title: 'กำลังอัปเดตสถานะ',
                 text: 'กรุณารอสักครู่...',
                 allowOutsideClick: false,
+                showConfirmButton: false,
                 didOpen: () => {
                     Swal.showLoading();
                 }
             });
             
-            // Submit form via AJAX
+            // ส่งข้อมูลผ่าน AJAX
             $.ajax({
                 url: 'update_status.php',
                 type: 'POST',
@@ -454,48 +518,88 @@ try {
                 processData: false,
                 contentType: false,
                 dataType: 'json',
+                timeout: 30000, // 30 วินาที
                 success: function(response) {
+                    console.log('Response:', response);
+                    
                     Swal.close();
                     
-                    if (response.success) {
+                    if (response && response.success) {
                         Swal.fire({
                             title: 'สำเร็จ!',
-                            text: response.message,
+                            text: response.message || 'อัปเดตสถานะเรียบร้อยแล้ว',
                             icon: 'success',
                             confirmButtonText: 'ตกลง'
                         }).then(() => {
-                            location.reload();
+                            // รีโหลดหน้า
+                            window.location.reload();
                         });
                     } else {
                         Swal.fire({
                             title: 'ข้อผิดพลาด!',
-                            text: response.message,
+                            text: response.message || 'เกิดข้อผิดพลาดในการอัปเดตสถานะ',
                             icon: 'error',
                             confirmButtonText: 'ตกลง'
                         });
                     }
                 },
-                error: function() {
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', xhr.responseText);
+                    
                     Swal.close();
+                    
+                    let errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้';
+                    
+                    if (xhr.responseText) {
+                        try {
+                            const errorResponse = JSON.parse(xhr.responseText);
+                            errorMessage = errorResponse.message || errorMessage;
+                        } catch (e) {
+                            // ถ้าไม่ใช่ JSON ให้ใช้ fallback แบบ GET
+                            fallbackToGet();
+                            return;
+                        }
+                    }
+                    
                     Swal.fire({
                         title: 'ข้อผิดพลาด!',
-                        text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้',
+                        text: errorMessage,
                         icon: 'error',
                         confirmButtonText: 'ตกลง'
                     });
                 }
             });
-        });
+        }
+        
+        // ฟังก์ชัน fallback สำหรับกรณี AJAX ไม่ทำงาน
+        function fallbackToGet() {
+            const requestId = $('#request_id').val();
+            const newStatus = $('#new_status').val();
+            const comment = $('#comment').val();
+            const rejectionReason = $('#rejection_reason').val();
+            
+            const params = new URLSearchParams({
+                request_id: requestId,
+                new_status: newStatus,
+                comment: comment,
+                rejection_reason: rejectionReason
+            });
+            
+            window.location.href = 'update_status.php?' + params.toString();
+        }
     });
     
     // Function to open update status modal
     function updateStatus(requestId) {
+        // รีเซ็ตฟอร์ม
+        $('#request_id').val(requestId);
         $('#new_status').val('');
         $('#comment').val('');
         $('#rejection_reason').val('');
         $('#rejection_reason_group').hide();
         $('#rejection_reason').prop('required', false);
         
+        // แสดง modal
         $('#updateStatusModal').modal('show');
     }
 </script>
