@@ -9,7 +9,7 @@ require_once '../config/functions.php';
 $error = '';
 $success = '';
 
-// ถ้ามีการส่งแบบฟอร์ม
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         // เริ่ม Transaction
@@ -84,22 +84,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
 
-        // เพิ่มข้อมูลคำร้อง
+        // เพิ่มข้อมูลคำร้อง (แก้ไขส่วนนี้)
         $semester = $_POST['semester'] ?? '';
         $academic_year = $_POST['academic_year'] ?? '';
+        $advisor_id = $_POST['advisor_id'] ?? null; // เพิ่มบรรทัดนี้
+        $department_head_id = $_POST['department_head_id'] ?? null; // เพิ่มบรรทัดนี้
         $request_date = date('Y-m-d');
 
         if (empty($semester) || empty($academic_year)) {
             throw new Exception('กรุณาเลือกภาคเรียนและปีการศึกษา');
         }
 
+        // แก้ไข SQL Query ให้รวมฟิลด์ advisor_id และ department_head_id
         $stmt = $pdo->prepare("
-            INSERT INTO course_requests (student_id, semester, academic_year, request_date, status)
-            VALUES (:student_id, :semester, :academic_year, :request_date, 'รอดำเนินการ')
+            INSERT INTO course_requests (student_id, advisor_id, department_head_id, semester, academic_year, request_date, status)
+            VALUES (:student_id, :advisor_id, :department_head_id, :semester, :academic_year, :request_date, 'รอดำเนินการ')
         ");
 
+        // แก้ไขการ execute ให้รวมค่า advisor_id และ department_head_id
         $stmt->execute([
             'student_id' => $student_id,
+            'advisor_id' => empty($advisor_id) ? null : $advisor_id, // ถ้าว่างให้เป็น null
+            'department_head_id' => empty($department_head_id) ? null : $department_head_id, // ถ้าว่างให้เป็น null
             'semester' => $semester,
             'academic_year' => $academic_year,
             'request_date' => $request_date
@@ -158,7 +164,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = $e->getMessage();
     }
 }
-
 // ดึงข้อมูลสาขาวิชา
 $stmt = $pdo->query("SELECT * FROM departments ORDER BY department_name");
 $departments = $stmt->fetchAll();
